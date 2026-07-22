@@ -1,0 +1,185 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useStore } from "@/lib/store";
+import { TODAY } from "@/lib/seed";
+import { CANCEL_REASONS, type CancelledBy } from "@/lib/types";
+import { Icon } from "@/components/icons";
+import {
+  Card,
+  PrimaryButton,
+  SectionTitle,
+  StatusTag,
+  Table,
+  Td,
+  Th,
+  THead,
+  Tr,
+} from "@/components/ui";
+
+export default function CancellationLog() {
+  const {
+    cancellationRows,
+    sessions,
+    schoolName,
+    classById,
+    logCancellation,
+    toast,
+  } = useStore();
+
+  const [open, setOpen] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [cancelledBy, setCancelledBy] = useState<CancelledBy>("School");
+  const [reason, setReason] = useState(CANCEL_REASONS[0]);
+  const [reschedule, setReschedule] = useState("");
+
+  const openSessions = useMemo(
+    () => sessions.filter((s) => s.status !== "Cancelled"),
+    [sessions]
+  );
+
+  function submit() {
+    if (!sessionId) {
+      toast("Pick a session first");
+      return;
+    }
+    logCancellation(sessionId, cancelledBy, reason, reschedule || null);
+    const cls = classById(sessions.find((s) => s.id === sessionId)!.classId);
+    toast(`${cls?.className ?? "Session"} cancellation logged`);
+    setOpen(false);
+    setSessionId("");
+    setReschedule("");
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle
+        icon="cancel"
+        right={
+          <PrimaryButton icon="plus" onClick={() => setOpen((v) => !v)}>
+            Log Cancellation
+          </PrimaryButton>
+        }
+      >
+        Cancellation Log
+      </SectionTitle>
+
+      {open && (
+        <Card className="animate-fade-up p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Session">
+              <select
+                value={sessionId}
+                onChange={(e) => setSessionId(e.target.value)}
+                className="k-field"
+              >
+                <option value="">Select session…</option>
+                {openSessions.map((s) => {
+                  const cls = classById(s.classId);
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {cls ? schoolName(cls.schoolId) : ""} · {cls?.className} ·{" "}
+                      {s.date}
+                    </option>
+                  );
+                })}
+              </select>
+            </Field>
+            <Field label="Cancelled By">
+              <select
+                value={cancelledBy}
+                onChange={(e) => setCancelledBy(e.target.value as CancelledBy)}
+                className="k-field"
+              >
+                <option value="School">School</option>
+                <option value="KLUTCH">KLUTCH</option>
+              </select>
+            </Field>
+            <Field label="Reason">
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="k-field"
+              >
+                {CANCEL_REASONS.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Rescheduled Date (optional)">
+              <input
+                type="date"
+                value={reschedule}
+                onChange={(e) => setReschedule(e.target.value)}
+                className="k-field"
+              />
+            </Field>
+          </div>
+          <div className="mt-3">
+            <PrimaryButton icon="check" onClick={submit}>
+              Save Cancellation
+            </PrimaryButton>
+          </div>
+        </Card>
+      )}
+
+      <Card className="overflow-hidden">
+        <Table>
+          <THead>
+            <Th>Date</Th>
+            <Th>School</Th>
+            <Th>Class</Th>
+            <Th>Cancelled By</Th>
+            <Th>Reason</Th>
+            <Th>Rescheduled?</Th>
+          </THead>
+          <tbody>
+            {cancellationRows.map((r, i) => (
+              <Tr key={r.id} i={i}>
+                <Td>{r.date}</Td>
+                <Td className="font-semibold text-content">
+                  {r.schoolId ? schoolName(r.schoolId) : "—"}
+                </Td>
+                <Td>{r.className}</Td>
+                <Td>
+                  <StatusTag value={r.cancelledBy} />
+                </Td>
+                <Td>{r.reason}</Td>
+                <Td>
+                  {r.rescheduledDate ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-500">
+                      <Icon name="check" size={13} /> {r.rescheduledDate}
+                    </span>
+                  ) : (
+                    <span className="text-faint">No</span>
+                  )}
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </Card>
+      <p className="text-xs text-faint">
+        Cancellations this month ({TODAY.slice(0, 7)}) feed the Admin dashboard
+        card automatically.
+      </p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-muted">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}

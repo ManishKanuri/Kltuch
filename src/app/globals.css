@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Theme tokens (space-separated RGB channels for <alpha-value>) ---------- */
+:root {
+  /* light / "day" mode */
+  --bg: 240 242 246;
+  --surface: 255 255 255;
+  --elevated: 248 250 252;
+  --content: 12 15 22;
+  --muted: 92 104 120;
+  --faint: 148 160 176;
+  --line: 224 228 236;
+}
+
+.dark {
+  /* dark / "night" mode */
+  --bg: 8 9 13;
+  --surface: 20 22 29;
+  --elevated: 27 30 39;
+  --content: 236 239 245;
+  --muted: 150 161 178;
+  --faint: 96 106 122;
+  --line: 38 42 54;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--content));
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+::selection {
+  background: rgba(242, 107, 29, 0.3);
+}
+
+/* ---------- Scrollbars ---------- */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(34, 68, 219, 0.35);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  /* Brand gradient text (wordmark / hero numbers) */
+  .text-gradient {
+    background: linear-gradient(115deg, #4f7bff 0%, #f26b1d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Alternating table row — theme aware */
+  .row-alt {
+    background-color: rgb(var(--content) / 0.025);
+  }
+
+  /* Inputs / selects */
+  .k-field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-content outline-none transition;
+  }
+  .k-field:focus {
+    border-color: #4f7bff;
+    box-shadow: 0 0 0 3px rgba(79, 123, 255, 0.18);
+  }
+
+  /* Meter track */
+  .meter {
+    @apply h-2 w-full overflow-hidden rounded-full;
+    background-color: rgb(var(--content) / 0.08);
+  }
+}
