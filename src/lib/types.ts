@@ -85,6 +85,33 @@ export interface Assessment {
   date: string;
 }
 
+// CISCE physical-fitness measurements. BMI is stored as a measurement only;
+// child BMI categories require age- and sex-specific clinical reference data.
+export interface FitnessAssessment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  schoolId: string;
+  age: number;
+  grade: number;
+  section: "A" | "B" | "C";
+  className: string;
+  gender: "Female" | "Male";
+  date: string;
+  speed50mSeconds: number;
+  stamina600mSeconds: number;
+  toeTouchCm: number;
+  pushUps: number;
+  curls: number;
+  heightCm: number;
+  weightKg: number;
+  bmi: number;
+  attendanceRate: number;
+  sessionsScheduled: number;
+  sessionsFinished: number;
+  sessionsMissed: number;
+}
+
 export type EquipmentCondition = "Good" | "Fair" | "Damaged";
 export type EquipmentStatus = "Active" | "Replace";
 export interface Equipment {

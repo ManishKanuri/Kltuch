@@ -17,6 +17,7 @@ import { ToastHost } from "./ui";
 
 import Dashboard from "@/modules/Dashboard";
 import SportsAnalytics from "@/modules/SportsAnalytics";
+import FitnessAnalytics from "@/modules/FitnessAnalytics";
 import CoachManagement from "@/modules/CoachManagement";
 import CoachAttendance from "@/modules/CoachAttendance";
 import SessionTracker from "@/modules/SessionTracker";
@@ -33,6 +34,8 @@ function ModuleView({ m }: { m: ModuleKey }) {
       return <Dashboard />;
     case "sports-analytics":
       return <SportsAnalytics />;
+    case "fitness-analytics":
+      return <FitnessAnalytics />;
     case "coach-management":
       return <CoachManagement />;
     case "coach-attendance":

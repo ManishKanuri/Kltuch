@@ -3,6 +3,7 @@ import {
   type Assessment,
   type ClassRoom,
   type CoachAttendance,
+  type FitnessAssessment,
   type Session,
   type SkillKey,
   type Sport,
@@ -155,3 +156,73 @@ export function analyzeStudent(
 }
 
 export const SKILL_ORDER = SKILLS;
+
+export const FITNESS_METRICS = [
+  { key: "speed50mSeconds", label: "50m Dash", unit: "sec", higherIsBetter: false },
+  { key: "stamina600mSeconds", label: "600m Run / Walk", unit: "sec", higherIsBetter: false },
+  { key: "toeTouchCm", label: "Forward Toe Touch", unit: "cm", higherIsBetter: true },
+  { key: "pushUps", label: "Push-ups", unit: "reps", higherIsBetter: true },
+  { key: "curls", label: "Curls", unit: "reps", higherIsBetter: true },
+] as const;
+
+export type FitnessMetricKey = (typeof FITNESS_METRICS)[number]["key"];
+
+export function mean(values: number[]) {
+  return values.length
+    ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
+    : 0;
+}
+
+export function fitnessAverages(records: FitnessAssessment[]) {
+  return Object.fromEntries(
+    FITNESS_METRICS.map((metric) => [
+      metric.key,
+      mean(records.map((record) => record[metric.key])),
+    ])
+  ) as Record<FitnessMetricKey, number>;
+}
+
+export function analyzeFitnessStudent(
+  student: FitnessAssessment,
+  cohort: FitnessAssessment[]
+) {
+  const averages = fitnessAverages(cohort);
+  const insights = FITNESS_METRICS.map((metric) => {
+    const value = student[metric.key];
+    const average = averages[metric.key];
+    const rawDelta = Math.round((value - average) * 10) / 10;
+    const better = metric.higherIsBetter ? rawDelta >= 0 : rawDelta <= 0;
+    const relative = average ? Math.round((Math.abs(rawDelta) / average) * 100) : 0;
+    return { ...metric, value, average, rawDelta, better, relative };
+  });
+  const strengths = [...insights].filter((item) => item.better).sort((a, b) => b.relative - a.relative).slice(0, 2);
+  const focus = [...insights].filter((item) => !item.better).sort((a, b) => b.relative - a.relative).slice(0, 2);
+  const aboveAverage = insights.filter((item) => item.better).length;
+  return {
+    insights,
+    strengths,
+    focus,
+    aboveAverage,
+    profile: aboveAverage >= 4 ? "Strong all-round profile" : aboveAverage >= 3 ? "Developing well" : "Focused support recommended",
+  };
+}
+
+export function fitnessScore(student: FitnessAssessment, peers: FitnessAssessment[]) {
+  if (peers.length < 2) return 0;
+  const score = FITNESS_METRICS.reduce((sum, metric) => {
+    const values = peers.map((peer) => peer[metric.key]);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) return sum + 50;
+    const ratio = (student[metric.key] - min) / (max - min);
+    return sum + (metric.higherIsBetter ? ratio : 1 - ratio) * 100;
+  }, 0);
+  return Math.round(score / FITNESS_METRICS.length);
+}
+
+export function fitnessLeaderboard(records: FitnessAssessment[]) {
+  return records.map((student) => {
+    const peers = records.filter((peer) => peer.age === student.age && peer.gender === student.gender);
+    return { student, score: fitnessScore(student, peers) };
+  }).sort((a, b) => b.score - a.score).slice(0, 10);
+}

@@ -27,6 +27,7 @@ export default function Dashboard() {
     coaches,
     attendance,
     assessments,
+    fitnessAssessments,
     classes,
     cancellationRows,
     coachName,
@@ -58,13 +59,21 @@ export default function Dashboard() {
       absentToday: coaches.length - presentToday,
       pendingAssessments,
       cancelMTD,
+      fitnessAssessed: fitnessAssessments.length,
     };
-  }, [sessions, coaches, attendance, assessments, classes, cancellationRows]);
+  }, [sessions, coaches, attendance, assessments, classes, cancellationRows, fitnessAssessments]);
 
   const sports = useMemo(
     () => sportBreakdown(classes, sessions),
     [classes, sessions]
   );
+  const fitnessEngagement = useMemo(() => {
+    const scheduled = fitnessAssessments.reduce((sum, record) => sum + record.sessionsScheduled, 0);
+    const finished = fitnessAssessments.reduce((sum, record) => sum + record.sessionsFinished, 0);
+    const missed = fitnessAssessments.reduce((sum, record) => sum + record.sessionsMissed, 0);
+    const attendanceRate = scheduled ? Math.round((finished / scheduled) * 100) : 0;
+    return { finished, missed, attendanceRate };
+  }, [fitnessAssessments]);
 
   const activity = useMemo(() => {
     const times = [
@@ -125,11 +134,11 @@ export default function Dashboard() {
           sub={`${stats.absentToday} absent today`}
         />
         <StatCard
-          label="Pending Assessments"
+          label="Fitness Baselines"
           icon="assessment"
           tone="orange"
-          value={stats.pendingAssessments}
-          sub="Classes without ratings"
+          value={stats.fitnessAssessed}
+          sub={`${stats.pendingAssessments} classes pending skills`}
         />
         <StatCard
           label="Cancellations MTD"
@@ -157,6 +166,19 @@ export default function Dashboard() {
         <OutlineButton icon="analytics" onClick={() => setActive("sports-analytics")}>
           Sports Analytics
         </OutlineButton>
+        <OutlineButton icon="assessment" onClick={() => setActive("fitness-analytics")}>
+          Fitness Analytics
+        </OutlineButton>
+      </div>
+
+      {/* Sports at a glance */}
+      <div>
+        <SectionTitle icon="attendance">Fitness Engagement</SectionTitle>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard label="Student Attendance" icon="attendance" tone="tennis" value={`${fitnessEngagement.attendanceRate}%`} sub="Across recorded fitness sessions" />
+          <StatCard label="Sessions Finished" icon="check-circle" tone="blue" value={fitnessEngagement.finished.toLocaleString()} sub="Student session completions" />
+          <StatCard label="Sessions Missed" icon="cancel" tone="orange" value={fitnessEngagement.missed.toLocaleString()} sub="Follow-up opportunities" />
+        </div>
       </div>
 
       {/* Sports at a glance */}

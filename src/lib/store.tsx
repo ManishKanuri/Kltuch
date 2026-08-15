@@ -17,6 +17,7 @@ import type {
   CoachAttendance,
   CurriculumWeek,
   Equipment,
+  FitnessAssessment,
   Role,
   School,
   Session,
@@ -24,6 +25,7 @@ import type {
   SkillKey,
 } from "./types";
 import * as seed from "./seed";
+import { fitnessAssessments as seededFitnessAssessments } from "./fitnessSeed";
 import type { ModuleKey } from "./nav";
 
 // ---- lightweight id generator (deterministic-ish, no Date.now needed) ----
@@ -56,6 +58,7 @@ interface StoreShape {
   equipment: Equipment[];
   attendance: CoachAttendance[];
   curriculum: CurriculumWeek[];
+  fitnessAssessments: FitnessAssessment[];
 
   // actions
   toggleAttendance: (coachId: string) => void;
@@ -280,6 +283,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       equipment,
       attendance,
       curriculum,
+      fitnessAssessments: seededFitnessAssessments,
       toggleAttendance,
       setSessionStatus,
       setCurriculumWeek,

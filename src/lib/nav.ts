@@ -4,6 +4,7 @@ import type { Role } from "./types";
 export type ModuleKey =
   | "dashboard"
   | "sports-analytics"
+  | "fitness-analytics"
   | "coach-management"
   | "coach-attendance"
   | "session-tracker"
@@ -31,6 +32,7 @@ export const ADMIN_NAV: NavSection[] = [
     items: [
       { key: "dashboard", label: "Dashboard", icon: "dashboard" },
       { key: "sports-analytics", label: "Sports Analytics", icon: "analytics" },
+      { key: "fitness-analytics", label: "Fitness Analytics", icon: "assessment" },
     ],
   },
   {
@@ -67,6 +69,7 @@ export const ADMIN_NAV: NavSection[] = [
 export const PAGE_TITLES: Record<ModuleKey, string> = {
   dashboard: "Admin Dashboard",
   "sports-analytics": "Sports Analytics",
+  "fitness-analytics": "CISCE Fitness Analytics",
   "coach-management": "Coach Management",
   "coach-attendance": "Coach Attendance",
   "session-tracker": "Session Tracker",

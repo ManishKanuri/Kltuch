@@ -21,17 +21,6 @@ export const metadata: Metadata = {
     "KLUTCH SportsEd operations platform — coach attendance, sessions, sports analytics, student report cards, equipment, and school reports.",
 };
 
-// Set the theme class before paint to avoid a flash of the wrong mode.
-const themeScript = `
-(function(){
-  try {
-    var t = localStorage.getItem('klutch-theme');
-    if (t === 'light') document.documentElement.classList.remove('dark');
-    else document.documentElement.classList.add('dark');
-  } catch (e) { document.documentElement.classList.add('dark'); }
-})();
-`;
-
 export default function RootLayout({
   children,
 }: {
@@ -39,9 +28,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
       <body className={`${sora.variable} ${inter.variable} font-sans antialiased`}>
         {children}
       </body>

@@ -6,6 +6,7 @@ import { analyzeStudent } from "@/lib/stats";
 import { SKILL_LABELS, type Assessment, type SkillKey } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { LogoMark } from "@/components/Logo";
+import FitnessReportCards from "@/components/FitnessReportCards";
 import {
   Card,
   PrimaryButton,
@@ -163,6 +164,8 @@ export default function StudentAssessment() {
           </tbody>
         </Table>
       </Card>
+
+      <FitnessReportCards />
 
       {reportFor && (
         <ReportCard
