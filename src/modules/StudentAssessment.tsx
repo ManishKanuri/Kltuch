@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { analyzeStudent } from "@/lib/stats";
 import { SKILL_LABELS, type Assessment, type SkillKey } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { LogoMark } from "@/components/Logo";
 import FitnessReportCards from "@/components/FitnessReportCards";
+import { downloadElementPdf } from "@/lib/pdf";
 import {
   Card,
   PrimaryButton,
@@ -201,12 +202,30 @@ function ReportCard({
     return analyzeStudent({ ...a, ratings: r }, classmates);
   }, [a, r, assessments]);
 
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function downloadPdf() {
+    if (!cardRef.current || saving) return;
+    setSaving(true);
+    try {
+      const safeName = `${a.studentName}-${a.term}`.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      await downloadElementPdf(cardRef.current, `report-card-${safeName}.pdf`);
+      toast("Report card PDF downloaded");
+    } catch {
+      toast("Could not generate PDF — please try again");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
+        ref={cardRef}
         className="animate-fade-up scrollbar-thin max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -375,14 +394,15 @@ function ReportCard({
 
           <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
             <p className="text-[11px] text-faint">
-              Auto-generated · renders server-side via React-PDF in production.
+              Auto-generated · downloads a PDF snapshot of this report card.
             </p>
-            <div className="flex gap-2">
+            <div data-pdf-hide className="flex gap-2">
               <button
-                onClick={() => toast("Report card PDF downloaded (demo)")}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-medium text-content transition hover:border-klutch-blue-bright"
+                onClick={downloadPdf}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-medium text-content transition hover:border-klutch-blue-bright disabled:opacity-60"
               >
-                <Icon name="download" size={15} /> PDF
+                <Icon name="download" size={15} /> {saving ? "Generating…" : "PDF"}
               </button>
               <PrimaryButton icon="check" onClick={() => onSave(r)}>
                 Save Report

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { analyzeFitnessStudent, FITNESS_METRICS } from "@/lib/stats";
 import type { FitnessAssessment } from "@/lib/types";
 import { Icon } from "./icons";
 import { LogoMark } from "./Logo";
 import { Card, SectionTitle, Table, Td, Th, THead, Tr } from "./ui";
+import { downloadElementPdf } from "@/lib/pdf";
 
 export default function FitnessReportCards() {
   const { fitnessAssessments, schools, schoolName } = useStore();
@@ -59,9 +60,25 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
   const { fitnessAssessments, schoolName, toast } = useStore();
   const cohort = useMemo(() => fitnessAssessments.filter((candidate) => candidate.schoolId === record.schoolId && candidate.grade === record.grade), [fitnessAssessments, record]);
   const analysis = useMemo(() => analyzeFitnessStudent(record, cohort), [record, cohort]);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function downloadPdf() {
+    if (!cardRef.current || saving) return;
+    setSaving(true);
+    try {
+      const safeName = `${record.studentName}-${record.studentId}`.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      await downloadElementPdf(cardRef.current, `fitness-report-card-${safeName}.pdf`);
+      toast("Fitness report card PDF downloaded");
+    } catch {
+      toast("Could not generate PDF — please try again");
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="animate-fade-up scrollbar-thin max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div ref={cardRef} className="animate-fade-up scrollbar-thin max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="relative overflow-hidden bg-klutch-ink bg-sidebar-glow px-6 py-5 text-white">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3"><LogoMark size={40} /><div><div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">CISCE Fitness Report Card</div><div className="font-display text-2xl font-extrabold">{record.studentName}</div><div className="mt-0.5 text-sm text-slate-400">{record.studentId} · {record.className} · {record.gender} · {schoolName(record.schoolId)}</div></div></div>
@@ -81,7 +98,7 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
             <InsightBox title="Focus for coaching" tone="amber" items={analysis.focus.map((item) => item.label)} empty="Continue maintaining the current all-round routine." />
           </div>
           <p className="rounded-xl border border-line bg-elevated p-3 text-xs leading-relaxed text-muted">This report compares fitness performance with students in the same school and grade. It supports sports coaching and is not medical advice. BMI requires age- and sex-specific percentile data before any clinical interpretation.</p>
-          <div className="flex justify-end border-t border-line pt-4"><button onClick={() => toast("Fitness report card PDF downloaded (demo)")} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3.5 py-2.5 text-sm font-semibold text-white shadow-brand"><Icon name="download" size={15} /> Download PDF</button></div>
+          <div data-pdf-hide className="flex justify-end border-t border-line pt-4"><button onClick={downloadPdf} disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3.5 py-2.5 text-sm font-semibold text-white shadow-brand disabled:opacity-60"><Icon name="download" size={15} /> {saving ? "Generating…" : "Download PDF"}</button></div>
         </div>
       </div>
     </div>

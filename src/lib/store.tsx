@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -118,16 +119,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
-  const [toastSeq, setToastSeq] = useState(1);
+  const toastSeq = useRef(0);
 
   const toast = useCallback(
     (text: string) => {
-      setToastSeq((s) => {
-        const id = s;
-        setToasts((t) => [...t, { id, text }]);
-        // auto-dismiss handled in UI via effect; keep store simple
-        return s + 1;
-      });
+      // ref-based id so the updater stays pure (Strict Mode double-invokes updaters)
+      const id = (toastSeq.current += 1);
+      setToasts((t) => [...t, { id, text }]);
+      // auto-dismiss handled in UI via effect; keep store simple
     },
     []
   );
