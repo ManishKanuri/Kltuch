@@ -103,26 +103,30 @@ export function StatCard({
           : "before:bg-klutch-blue";
   const iconTone =
     tone === "orange"
-      ? "text-klutch-orange"
+      ? "bg-klutch-orange/12 text-klutch-orange"
       : tone === "tennis"
-        ? "text-klutch-tennis-deep"
+        ? "bg-klutch-tennis-deep/12 text-klutch-tennis-deep"
         : tone === "neutral"
-          ? "text-faint"
-          : "text-klutch-blue-bright";
+          ? "bg-content/8 text-faint"
+          : "bg-klutch-blue/12 text-klutch-blue-bright";
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card dark:shadow-card-dark before:absolute before:inset-x-0 before:top-0 before:h-[3px] ${bar}`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-faint">
           {label}
         </div>
-        {icon && <Icon name={icon} size={16} className={iconTone} />}
+        {icon && (
+          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconTone}`}>
+            <Icon name={icon} size={15} />
+          </div>
+        )}
       </div>
-      <div className="mt-1.5 font-display text-3xl font-extrabold text-content">
+      <div className="mt-2 font-display text-4xl font-extrabold leading-none tracking-tight text-content">
         {value}
       </div>
-      {sub ? <div className="mt-0.5 text-xs text-muted">{sub}</div> : null}
+      {sub ? <div className="mt-1.5 text-xs text-muted">{sub}</div> : null}
     </div>
   );
 }
