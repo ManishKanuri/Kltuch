@@ -31,16 +31,20 @@ import type { ModuleKey } from "./nav";
 import { createClient } from "./supabase/client";
 import {
   mapAssessment,
+  mapCancellation,
+  mapCancellationRow,
   mapClass,
   mapCoach,
+  mapCoachAttendance,
+  mapCurriculum,
+  mapEquipment,
   mapFitnessAssessment,
   mapSchool,
+  mapSession,
 } from "./supabase/mappers";
 
-// ---- lightweight id generator for the tables still on mock data ----
-// (sessions, cancellations, equipment, attendance, curriculum — out of pilot
-// scope; see docs/PRODUCTION_BLUEPRINT.md §9. Live on Supabase: schools,
-// coaches, classes, assessments, fitness_assessments.)
+// ---- lightweight id generator for optimistic-update temp IDs ----
+// (overwritten by the real UUID once each insert's response comes back)
 let _idc = 1000;
 const nid = (p: string) => `${p}_${++_idc}`;
 
@@ -143,29 +147,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.signOut();
   }, [supabase]);
 
-  // ---- Supabase-backed state (pilot scope) ----
+  // ---- Supabase-backed state ----
   const [schools, setSchools] = useState<School[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [classes, setClasses] = useState<ClassRoom[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [fitnessAssessments, setFitnessAssessments] = useState<FitnessAssessment[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [cancellations, setCancellations] = useState<Cancellation[]>([]);
+  const [cancellationRows, setCancellationRows] = useState<CancellationRow[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [attendance, setAttendance] = useState<CoachAttendance[]>([]);
+  const [curriculum, setCurriculum] = useState<CurriculumWeek[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // ---- still mock data: out of pilot scope (no table yet) ----
-  const [sessions, setSessions] = useState<Session[]>(seed.sessions);
-  const [cancellations, setCancellations] = useState<Cancellation[]>(
-    seed.cancellations
-  );
-  const [cancellationRows, setCancellationRows] = useState(
-    seed.cancellationRows.map((r) => ({ ...r }))
-  );
-  const [equipment, setEquipment] = useState<Equipment[]>(seed.equipment);
-  const [attendance, setAttendance] = useState<CoachAttendance[]>(
-    seed.coachAttendance
-  );
-  const [curriculum, setCurriculum] = useState<CurriculumWeek[]>(
-    seed.curriculum
-  );
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastSeq = useRef(0);
@@ -237,12 +231,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         classesRes,
         assessmentsRes,
         fitnessRes,
+        sessionsRes,
+        cancellationsRes,
+        cancellationRowsRes,
+        equipmentRes,
+        attendanceRes,
+        curriculumRes,
       ] = await Promise.all([
         supabase.from("schools").select("*"),
         supabase.from("coaches").select("*"),
         supabase.from("classes").select("*"),
         supabase.from("assessments").select("*"),
         supabase.from("fitness_assessments").select("*"),
+        supabase.from("sessions").select("*"),
+        supabase.from("cancellations").select("*"),
+        supabase.from("cancellation_rows").select("*"),
+        supabase.from("equipment").select("*"),
+        supabase.from("coach_attendance").select("*"),
+        supabase.from("curriculum").select("*"),
       ]);
 
       if (cancelled) return;
@@ -252,6 +258,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (classesRes.error) throw classesRes.error;
       if (assessmentsRes.error) throw assessmentsRes.error;
       if (fitnessRes.error) throw fitnessRes.error;
+      if (sessionsRes.error) throw sessionsRes.error;
+      if (cancellationsRes.error) throw cancellationsRes.error;
+      if (cancellationRowsRes.error) throw cancellationRowsRes.error;
+      if (equipmentRes.error) throw equipmentRes.error;
+      if (attendanceRes.error) throw attendanceRes.error;
+      if (curriculumRes.error) throw curriculumRes.error;
 
       const mappedSchools = schoolsRes.data.map(mapSchool);
       setSchools(mappedSchools);
@@ -259,6 +271,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setClasses(classesRes.data.map(mapClass));
       setAssessments(assessmentsRes.data.map(mapAssessment));
       setFitnessAssessments(fitnessRes.data.map(mapFitnessAssessment));
+      setSessions(sessionsRes.data.map(mapSession));
+      setCancellations(cancellationsRes.data.map(mapCancellation));
+      setCancellationRows(cancellationRowsRes.data.map(mapCancellationRow));
+      setEquipment(equipmentRes.data.map(mapEquipment));
+      setAttendance(attendanceRes.data.map(mapCoachAttendance));
+      setCurriculum(curriculumRes.data.map(mapCurriculum));
       setCurrentSchoolId((prev) => prev || mappedSchools[0]?.id || "");
       setLoading(false);
     }
@@ -292,30 +310,60 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [classById]
   );
 
-  const toggleAttendance = useCallback((coachId: string) => {
-    setAttendance((prev) => {
-      const existing = prev.find(
+  const toggleAttendance = useCallback(
+    (coachId: string) => {
+      const existing = attendance.find(
         (a) => a.coachId === coachId && a.date === seed.TODAY
       );
       if (existing) {
-        return prev.map((a) =>
-          a.id === existing.id ? { ...a, present: !a.present } : a
+        const nextPresent = !existing.present;
+        setAttendance((prev) =>
+          prev.map((a) => (a.id === existing.id ? { ...a, present: nextPresent } : a))
         );
+        supabase
+          .from("coach_attendance")
+          .update({ present: nextPresent })
+          .eq("id", existing.id)
+          .then(({ error }) => {
+            if (error) console.error("Failed to update attendance:", error);
+          });
+        return;
       }
-      return [
-        ...prev,
-        { id: nid("at"), coachId, date: seed.TODAY, present: true },
-      ];
-    });
-  }, []);
+      const tempId = nid("at");
+      setAttendance((prev) => [...prev, { id: tempId, coachId, date: seed.TODAY, present: true }]);
+      supabase
+        .from("coach_attendance")
+        .insert({ coach_id: coachId, date: seed.TODAY, present: true })
+        .select("*")
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Failed to save attendance:", error);
+            setAttendance((prev) => prev.filter((a) => a.id !== tempId));
+            return;
+          }
+          setAttendance((prev) =>
+            prev.map((a) => (a.id === tempId ? mapCoachAttendance(data) : a))
+          );
+        });
+    },
+    [attendance, supabase]
+  );
 
   const setSessionStatus = useCallback(
     (sessionId: string, status: SessionStatus) => {
       setSessions((prev) =>
         prev.map((s) => (s.id === sessionId ? { ...s, status } : s))
       );
+      supabase
+        .from("sessions")
+        .update({ status })
+        .eq("id", sessionId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to update session status:", error);
+        });
     },
-    []
+    [supabase]
   );
 
   const setCurriculumWeek = useCallback(
@@ -325,8 +373,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           s.id === sessionId ? { ...s, curriculumWeek: week } : s
         )
       );
+      supabase
+        .from("sessions")
+        .update({ curriculum_week: week })
+        .eq("id", sessionId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to update curriculum week:", error);
+        });
     },
-    []
+    [supabase]
   );
 
   const logCancellation = useCallback(
@@ -341,15 +396,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           s.id === sessionId ? { ...s, status: "Cancelled" as const } : s
         )
       );
+      supabase
+        .from("sessions")
+        .update({ status: "Cancelled" })
+        .eq("id", sessionId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to cancel session:", error);
+        });
+
+      const tempId = nid("ca");
       setCancellations((prev) => [
         ...prev,
-        { id: nid("ca"), sessionId, cancelledBy, reason, rescheduledDate },
+        { id: tempId, sessionId, cancelledBy, reason, rescheduledDate },
       ]);
       const sess = sessions.find((s) => s.id === sessionId);
       const cls = sess ? classes.find((c) => c.id === sess.classId) : undefined;
+      const tempRowId = nid("car");
       setCancellationRows((prev) => [
         {
-          id: nid("car"),
+          id: tempRowId,
           date: seed.TODAY,
           schoolId: cls?.schoolId ?? "",
           className: cls?.className ?? "—",
@@ -359,8 +424,39 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         },
         ...prev,
       ]);
+
+      supabase
+        .from("cancellations")
+        .insert({ session_id: sessionId, cancelled_by: cancelledBy, reason, rescheduled_date: rescheduledDate })
+        .select("*")
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Failed to log cancellation:", error);
+            setCancellations((prev) => prev.filter((c) => c.id !== tempId));
+            setCancellationRows((prev) => prev.filter((r) => r.id !== tempRowId));
+            return;
+          }
+          setCancellations((prev) =>
+            prev.map((c) => (c.id === tempId ? mapCancellation(data) : c))
+          );
+          // Refresh the denormalized view row with its real id, keeping the
+          // optimistic date/school/class fields (the view join is identical).
+          supabase
+            .from("cancellation_rows")
+            .select("*")
+            .eq("id", data.id)
+            .single()
+            .then(({ data: rowData }) => {
+              if (rowData) {
+                setCancellationRows((prev) =>
+                  prev.map((r) => (r.id === tempRowId ? mapCancellationRow(rowData) : r))
+                );
+              }
+            });
+        });
     },
-    [sessions, classes]
+    [sessions, classes, supabase]
   );
 
   const addAssessment = useCallback(
@@ -408,9 +504,35 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [supabase]
   );
 
-  const addEquipment = useCallback((e: Omit<Equipment, "id">) => {
-    setEquipment((prev) => [...prev, { ...e, id: nid("eq") }]);
-  }, []);
+  const addEquipment = useCallback(
+    (e: Omit<Equipment, "id">) => {
+      const tempId = nid("eq");
+      setEquipment((prev) => [...prev, { ...e, id: tempId }]);
+      supabase
+        .from("equipment")
+        .insert({
+          item_name: e.itemName,
+          qty: e.qty,
+          school_id: e.schoolId,
+          condition: e.condition,
+          date_issued: e.dateIssued,
+          status: e.status,
+        })
+        .select("*")
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Failed to save equipment:", error);
+            setEquipment((prev) => prev.filter((x) => x.id !== tempId));
+            return;
+          }
+          setEquipment((prev) =>
+            prev.map((x) => (x.id === tempId ? mapEquipment(data) : x))
+          );
+        });
+    },
+    [supabase]
+  );
 
   const updateEquipmentStatus = useCallback(
     (
@@ -421,8 +543,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setEquipment((prev) =>
         prev.map((e) => (e.id === id ? { ...e, condition, status } : e))
       );
+      supabase
+        .from("equipment")
+        .update({ condition, status })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to update equipment:", error);
+        });
     },
-    []
+    [supabase]
   );
 
   const addCoach = useCallback(
