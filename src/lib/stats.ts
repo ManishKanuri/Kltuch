@@ -207,6 +207,22 @@ export function analyzeFitnessStudent(
   };
 }
 
+// Status word shown under each metric bar on the report card, driven by how
+// far the student sits from the cohort average (as a %) and which direction.
+export function fitnessStatusWord(better: boolean, relative: number): "Excelling" | "On track" | "Developing" {
+  if (better && relative >= 15) return "Excelling";
+  if (better) return "On track";
+  return "Developing";
+}
+
+// Same status vocabulary, for the 1-5 star skill ratings on the Player
+// Report Card (not relative to cohort like fitness — a direct score read).
+export function skillStatusWord(score: number): "Excelling" | "On track" | "Developing" {
+  if (score >= 4) return "Excelling";
+  if (score >= 3) return "On track";
+  return "Developing";
+}
+
 export function fitnessScore(student: FitnessAssessment, peers: FitnessAssessment[]) {
   if (peers.length < 2) return 0;
   const score = FITNESS_METRICS.reduce((sum, metric) => {

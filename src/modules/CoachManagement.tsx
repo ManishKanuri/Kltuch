@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import {
   Card,
@@ -28,7 +28,12 @@ export default function CoachManagement() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [schoolId, setSchoolId] = useState(schools[0].id);
+  // schools loads asynchronously from Supabase — starts empty.
+  const [schoolId, setSchoolId] = useState("");
+
+  useEffect(() => {
+    if (!schoolId && schools.length) setSchoolId(schools[0].id);
+  }, [schoolId, schools]);
 
   function submit() {
     if (!name.trim()) return;

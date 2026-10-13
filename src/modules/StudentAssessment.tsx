@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import { analyzeStudent } from "@/lib/stats";
+import { analyzeStudent, skillStatusWord } from "@/lib/stats";
 import { SKILL_LABELS, type Assessment, type SkillKey } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { LogoMark } from "@/components/Logo";
@@ -10,6 +10,7 @@ import FitnessReportCards from "@/components/FitnessReportCards";
 import { downloadElementPdf } from "@/lib/pdf";
 import {
   Card,
+  Modal,
   PrimaryButton,
   RatingPill,
   SectionTitle,
@@ -21,6 +22,17 @@ import {
   THead,
   Tr,
 } from "@/components/ui";
+
+const SKILL_STATUS_BAR_COLOR: Record<string, string> = {
+  Excelling: "bg-klutch-tennis",
+  "On track": "bg-klutch-blue-bright",
+  Developing: "bg-klutch-orange",
+};
+const SKILL_STATUS_TEXT_COLOR: Record<string, string> = {
+  Excelling: "text-klutch-tennis",
+  "On track": "text-klutch-blue-bright",
+  Developing: "text-klutch-orange-bright",
+};
 
 const SKILLS: SkillKey[] = ["motorSkills", "coordination", "fitness", "attitude"];
 const emptyRatings = (): Record<SkillKey, number> => ({
@@ -35,12 +47,18 @@ export default function StudentAssessment() {
     useStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [classId, setClassId] = useState(classes[0].id);
+  // classes loads asynchronously from Supabase — starts empty, so this can't
+  // read classes[0] synchronously. Synced once real data arrives below.
+  const [classId, setClassId] = useState("");
   const [term, setTerm] = useState("Term 1");
   const [ratings, setRatings] = useState<Record<SkillKey, number>>(
     emptyRatings()
   );
   const [reportFor, setReportFor] = useState<Assessment | null>(null);
+
+  useEffect(() => {
+    if (!classId && classes.length) setClassId(classes[0].id);
+  }, [classId, classes]);
 
   function submit() {
     if (!name.trim()) return;
@@ -220,15 +238,7 @@ function ReportCard({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        ref={cardRef}
-        className="animate-fade-up scrollbar-thin max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal ref={cardRef} onClose={onClose} className="max-w-2xl">
         {/* Header */}
         <div className="relative overflow-hidden bg-klutch-ink bg-sidebar-glow px-6 py-5 text-white">
           <div className="flex items-start justify-between">
@@ -306,47 +316,50 @@ function ReportCard({
           </div>
 
           {/* Per-skill comparison bars */}
-          <div>
-            <div className="mb-2 text-sm font-bold text-content">
-              Skill Breakdown &amp; Analysis
+          <div className="overflow-hidden rounded-2xl bg-klutch-ink p-5 text-white">
+            <div className="mb-4 font-display text-sm font-bold uppercase tracking-wide text-slate-400">
+              Skill Breakdown
             </div>
-            <div className="space-y-3">
-              {analysis.insights.map((ins) => (
-                <div key={ins.skill}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-content">
-                      {SKILL_LABELS[ins.skill]}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <StarRating
-                        value={r[ins.skill]}
-                        onChange={(v) =>
-                          setR((p) => ({ ...p, [ins.skill]: v }))
-                        }
-                      />
-                      <DeltaChip delta={ins.delta} />
-                    </span>
-                  </div>
-                  {/* student vs class average */}
-                  <div className="relative">
-                    <div className="meter">
+            <div className="space-y-4">
+              {analysis.insights.map((ins) => {
+                const status = skillStatusWord(r[ins.skill]);
+                return (
+                  <div key={ins.skill}>
+                    <div className="mb-1.5 flex items-center justify-between text-sm">
+                      <span className="font-medium text-white">
+                        {SKILL_LABELS[ins.skill]}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <StarRating
+                          value={r[ins.skill]}
+                          onChange={(v) =>
+                            setR((p) => ({ ...p, [ins.skill]: v }))
+                          }
+                        />
+                      </span>
+                    </div>
+                    <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-brand-gradient"
+                        className={`h-full origin-left rounded-full ${SKILL_STATUS_BAR_COLOR[status]} animate-grow-bar`}
                         style={{ width: `${(r[ins.skill] / 5) * 100}%` }}
                       />
+                      <div
+                        className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded bg-white/50"
+                        style={{ left: `${(ins.classAvg / 5) * 100}%` }}
+                        title={`Class avg ${ins.classAvg}`}
+                      />
                     </div>
-                    <div
-                      className="absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2 rounded bg-content"
-                      style={{ left: `${(ins.classAvg / 5) * 100}%` }}
-                      title={`Class avg ${ins.classAvg}`}
-                    />
+                    <div className="mt-1 flex items-center justify-between text-xs">
+                      <span className={`font-semibold uppercase tracking-wide ${SKILL_STATUS_TEXT_COLOR[status]}`}>
+                        {status}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-slate-500">
+                        class avg {ins.classAvg} <DeltaChip delta={ins.delta} />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-faint">
-              <span className="h-2.5 w-0.5 rounded bg-content" /> marker = class
-              average
+                );
+              })}
             </div>
           </div>
 
@@ -410,8 +423,7 @@ function ReportCard({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

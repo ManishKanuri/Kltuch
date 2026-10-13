@@ -2,12 +2,23 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import { analyzeFitnessStudent, FITNESS_METRICS } from "@/lib/stats";
+import { analyzeFitnessStudent, fitnessStatusWord, FITNESS_METRICS } from "@/lib/stats";
 import type { FitnessAssessment } from "@/lib/types";
 import { Icon } from "./icons";
 import { LogoMark } from "./Logo";
-import { Card, SectionTitle, Table, Td, Th, THead, Tr } from "./ui";
+import { Card, Modal, SectionTitle, Table, Td, Th, THead, Tr } from "./ui";
 import { downloadElementPdf } from "@/lib/pdf";
+
+const STATUS_BAR_COLOR: Record<string, string> = {
+  Excelling: "bg-klutch-tennis",
+  "On track": "bg-klutch-blue-bright",
+  Developing: "bg-klutch-orange",
+};
+const STATUS_TEXT_COLOR: Record<string, string> = {
+  Excelling: "text-klutch-tennis",
+  "On track": "text-klutch-blue-bright",
+  Developing: "text-klutch-orange-bright",
+};
 
 export default function FitnessReportCards() {
   const { fitnessAssessments, schools, schoolName } = useStore();
@@ -77,8 +88,7 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
     }
   }
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div ref={cardRef} className="animate-fade-up scrollbar-thin max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <Modal ref={cardRef} onClose={onClose} className="max-w-2xl">
         <div className="relative overflow-hidden bg-klutch-ink bg-sidebar-glow px-6 py-5 text-white">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3"><LogoMark size={40} /><div><div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">CISCE Fitness Report Card</div><div className="font-display text-2xl font-extrabold">{record.studentName}</div><div className="mt-0.5 text-sm text-slate-400">{record.studentId} · {record.className} · {record.gender} · {schoolName(record.schoolId)}</div></div></div>
@@ -92,7 +102,41 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
             <Summary label="BMI measurement" value={String(record.bmi)} sub="Recorded value — not a diagnosis" />
             <Summary label="Attendance" value={`${record.attendanceRate}%`} sub={`${record.sessionsFinished}/${record.sessionsScheduled} sessions finished`} />
           </div>
-          <div><div className="mb-2 text-sm font-bold text-content">Fitness Breakdown</div><div className="space-y-3">{analysis.insights.map((item) => <div key={item.key} className="rounded-xl border border-line bg-elevated p-3"><div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium text-content">{item.label}</span><span className="font-bold text-content">{item.value} {item.unit}</span></div><div className="mt-1 flex items-center justify-between text-xs"><span className="text-muted">School-grade average: {item.average} {item.unit}</span><span className={item.better ? "font-semibold text-emerald-500" : "font-semibold text-amber-500"}>{item.better ? "At / better than" : "Below"} cohort average</span></div></div>)}</div></div>
+
+          <div className="overflow-hidden rounded-2xl bg-klutch-ink p-5 text-white">
+            <div className="mb-4 font-display text-sm font-bold uppercase tracking-wide text-slate-400">
+              Fitness Breakdown
+            </div>
+            <div className="space-y-4">
+              {analysis.insights.map((item) => {
+                const status = fitnessStatusWord(item.better, item.relative);
+                const fillPct = Math.max(8, Math.min(100, 50 + (item.better ? 1 : -1) * item.relative));
+                return (
+                  <div key={item.key}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="font-medium text-white">{item.label}</span>
+                      <span className="font-display font-bold text-white">
+                        {item.value} <span className="text-xs font-normal text-slate-400">{item.unit}</span>
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className={`h-full origin-left rounded-full ${STATUS_BAR_COLOR[status]} animate-grow-bar`}
+                        style={{ width: `${fillPct}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs">
+                      <span className={`font-semibold uppercase tracking-wide ${STATUS_TEXT_COLOR[status]}`}>
+                        {status}
+                      </span>
+                      <span className="text-slate-500">cohort avg {item.average} {item.unit}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <InsightBox title="Strengths" tone="emerald" items={analysis.strengths.map((item) => item.label)} empty="Consistent profile across the current measures." />
             <InsightBox title="Focus for coaching" tone="amber" items={analysis.focus.map((item) => item.label)} empty="Continue maintaining the current all-round routine." />
@@ -100,8 +144,7 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
           <p className="rounded-xl border border-line bg-elevated p-3 text-xs leading-relaxed text-muted">This report compares fitness performance with students in the same school and grade. It supports sports coaching and is not medical advice. BMI requires age- and sex-specific percentile data before any clinical interpretation.</p>
           <div data-pdf-hide className="flex justify-end border-t border-line pt-4"><button onClick={downloadPdf} disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3.5 py-2.5 text-sm font-semibold text-white shadow-brand disabled:opacity-60"><Icon name="download" size={15} /> {saving ? "Generating…" : "Download PDF"}</button></div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

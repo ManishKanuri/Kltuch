@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { EquipmentCondition, EquipmentStatus } from "@/lib/types";
 import {
@@ -29,7 +29,12 @@ export default function EquipmentLog() {
   const [open, setOpen] = useState(false);
   const [item, setItem] = useState("");
   const [qty, setQty] = useState(1);
-  const [schoolId, setSchoolId] = useState(schools[0].id);
+  // schools loads asynchronously from Supabase — starts empty.
+  const [schoolId, setSchoolId] = useState("");
+
+  useEffect(() => {
+    if (!schoolId && schools.length) setSchoolId(schools[0].id);
+  }, [schoolId, schools]);
 
   const needsReplace = equipment.filter((e) => e.status === "Replace").length;
 

@@ -1,9 +1,38 @@
 "use client";
 
-import { useEffect } from "react";
+import { forwardRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "@/lib/store";
 import { Icon, StarGlyph, type IconName } from "./icons";
 import { SPORT_COLOR, SPORT_ICON, type Sport } from "@/lib/types";
+
+// ---------------- Modal ----------------
+// Rendered via a portal to document.body. Without this, a `position: fixed`
+// overlay nested under <main> (which has a transform-based animation class)
+// gets pinned relative to <main> instead of the viewport — a CSS quirk where
+// any ancestor `transform` creates a new containing block for fixed
+// descendants. Portaling to <body> sidesteps that entirely.
+export const Modal = forwardRef<
+  HTMLDivElement,
+  { onClose: () => void; children: React.ReactNode; className?: string }
+>(function Modal({ onClose, children, className = "" }, ref) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        ref={ref}
+        className={`animate-fade-up scrollbar-thin max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl ${className}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+});
 
 // ---------------- Status tags ----------------
 const STATUS_STYLES: Record<string, string> = {
