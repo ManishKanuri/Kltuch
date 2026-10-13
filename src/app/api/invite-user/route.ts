@@ -63,17 +63,27 @@ export async function POST(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
 
   const { data, error } = await serviceClient.auth.admin.inviteUserByEmail(email, {
-    data: {
-      role,
-      coach_id: coachId ?? null,
-      school_id: schoolId ?? null,
-      full_name: fullName ?? null,
-    },
     redirectTo: `${appUrl}/login`,
   });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  // The role is set here, by code that has verified an admin is asking — never
+  // from metadata the invited person could edit.
+  const { error: profileError } = await serviceClient.from("profiles").insert({
+    id: data.user.id,
+    role,
+    coach_id: role === "coach" ? coachId! : null,
+    school_id: role === "school" ? schoolId! : null,
+    full_name: fullName ?? null,
+  });
+
+  if (profileError) {
+    // Remove the half-created account so the admin can simply try again.
+    await serviceClient.auth.admin.deleteUser(data.user.id);
+    return NextResponse.json({ error: profileError.message }, { status: 400 });
   }
 
   return NextResponse.json({ userId: data.user.id, email: data.user.email });

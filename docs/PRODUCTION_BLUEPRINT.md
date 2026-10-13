@@ -135,8 +135,12 @@ production the permission boundary must live in the database.
   | `school_id` (nullable FK → schools) | set when role = school |
   | `full_name`, `created_at` | metadata |
 
-- On signup, a Postgres trigger creates the `profiles` row. Role assignment is
-  an admin action (invite flow), not self-selected.
+- The invite API (`/api/invite-user`) creates the `profiles` row with the role
+  and scope the inviting admin chose. Roles never come from signup metadata,
+  which the person signing up controls, and public sign-up is disabled in
+  Supabase Auth, so accounts exist only by invitation.
+  (`scripts/invite-user.ts` does the same from the CLI, to bootstrap the first
+  admin of a new environment.)
 
 ### 5.2 Access matrix
 
