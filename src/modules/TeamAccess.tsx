@@ -1,0 +1,157 @@
+"use client";
+
+import { useState } from "react";
+import { useStore } from "@/lib/store";
+import type { Role } from "@/lib/types";
+import { Card, PrimaryButton, SectionTitle } from "@/components/ui";
+import { Icon } from "@/components/icons";
+
+export default function TeamAccess() {
+  const { coaches, schools, schoolName, toast } = useStore();
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<Role>("admin");
+  const [coachId, setCoachId] = useState(coaches[0]?.id ?? "");
+  const [schoolId, setSchoolId] = useState(schools[0]?.id ?? "");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<{ email: string; role: Role }[]>([]);
+
+  async function submit() {
+    if (!email.trim()) {
+      toast("Enter an email address");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch("/api/invite-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          fullName: fullName.trim() || undefined,
+          coachId: role === "coach" ? coachId : undefined,
+          schoolId: role === "school" ? schoolId : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error ?? "Invite failed");
+        return;
+      }
+      toast(`Invite sent to ${email.trim()}`);
+      setSent((prev) => [{ email: email.trim(), role }, ...prev]);
+      setEmail("");
+      setFullName("");
+    } catch {
+      toast("Invite failed — check your connection");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 pt-4">
+      <SectionTitle icon="coaches">Team Access</SectionTitle>
+      <p className="text-sm text-muted">
+        Invite founders as admins (full access) or coaches/schools (scoped to their own data).
+        Each person gets an email with a link to set their own password.
+      </p>
+
+      <Card className="max-w-xl space-y-4 p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="k-field w-full"
+              placeholder="person@klutchsportsed.com"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Full name (optional)</label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="k-field w-full"
+              placeholder="Jane Doe"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Role</label>
+          <div className="flex gap-2">
+            {(["admin", "coach", "school"] as Role[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium capitalize transition ${
+                  role === r
+                    ? "border-klutch-blue-bright bg-klutch-blue/10 text-klutch-blue-bright"
+                    : "border-line text-muted hover:border-klutch-blue-bright/50"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-faint">
+            {role === "admin" && "Full access to every school, coach, and record — use for founders."}
+            {role === "coach" && "Sees only their own assigned classes, students, and assessments."}
+            {role === "school" && "Sees only that school's own data, read-only."}
+          </p>
+        </div>
+
+        {role === "coach" && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Which coach record?</label>
+            <select value={coachId} onChange={(e) => setCoachId(e.target.value)} className="k-field w-full">
+              {coaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {schoolName(c.assignedSchoolId)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-faint">
+              This links the invited login to this existing coach record, so RLS scopes their access correctly.
+            </p>
+          </div>
+        )}
+
+        {role === "school" && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Which school?</label>
+            <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)} className="k-field w-full">
+              {schools.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <PrimaryButton icon="check" onClick={submit} disabled={sending}>
+          {sending ? "Sending invite…" : "Send invite"}
+        </PrimaryButton>
+      </Card>
+
+      {sent.length > 0 && (
+        <Card className="max-w-xl p-5">
+          <div className="mb-2 text-sm font-bold text-content">Sent this session</div>
+          <ul className="space-y-1.5 text-sm">
+            {sent.map((s, i) => (
+              <li key={i} className="flex items-center gap-2 text-muted">
+                <Icon name="check" size={14} className="text-emerald-500" />
+                {s.email} <span className="text-faint">· {s.role}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </div>
+  );
+}

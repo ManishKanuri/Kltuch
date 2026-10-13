@@ -27,6 +27,7 @@ import StudentAssessment from "@/modules/StudentAssessment";
 import EquipmentLog from "@/modules/EquipmentLog";
 import SchoolPortal from "@/modules/SchoolPortal";
 import CoachMobile from "@/modules/CoachMobile";
+import TeamAccess from "@/modules/TeamAccess";
 
 function ModuleView({ m }: { m: ModuleKey }) {
   switch (m) {
@@ -54,13 +55,29 @@ function ModuleView({ m }: { m: ModuleKey }) {
       return <SchoolPortal />;
     case "coach-mobile":
       return <CoachMobile />;
+    case "team-access":
+      return <TeamAccess />;
   }
 }
 
 export default function Shell() {
-  const { role, setRole, active, setActive, coachName, currentCoachId } =
-    useStore();
+  const {
+    role,
+    actualRole,
+    setRole,
+    active,
+    setActive,
+    coachName,
+    currentCoachId,
+    userEmail,
+    signOut,
+  } = useStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // actualRole gates what's real; `role` (possibly a "view as" override) only
+  // controls what's rendered, and setRole already refuses to override unless
+  // actualRole is admin — see store.tsx.
+  const canSwitchRole = actualRole === "admin";
 
   function switchRole(r: Role) {
     setRole(r);
@@ -89,8 +106,9 @@ export default function Shell() {
         <TopBar
           title={PAGE_TITLES[shownModule]}
           role={role}
-          userName={role === "coach" ? coachName(currentCoachId) : "Klutch Admin"}
-          onSwitchRole={switchRole}
+          userName={role === "coach" ? coachName(currentCoachId) : userEmail ?? "Klutch Admin"}
+          onSwitchRole={canSwitchRole ? switchRole : undefined}
+          onSignOut={signOut}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           showBurger={isAdmin}
           showLogo={!isAdmin}
@@ -101,8 +119,7 @@ export default function Shell() {
         </main>
 
         <footer className="border-t border-line px-6 py-3 text-[11px] text-faint">
-          KLUTCH SportsEd · Internal ERP · Demo build · Mock data ·{" "}
-          {ROLE_LABEL[role]} view
+          KLUTCH SportsEd · Internal ERP · {ROLE_LABEL[role]} view
         </footer>
       </div>
 
@@ -184,6 +201,7 @@ function TopBar({
   role,
   userName,
   onSwitchRole,
+  onSignOut,
   onToggleSidebar,
   showBurger,
   showLogo,
@@ -191,7 +209,8 @@ function TopBar({
   title: string;
   role: Role;
   userName: string;
-  onSwitchRole: (r: Role) => void;
+  onSwitchRole?: (r: Role) => void;
+  onSignOut: () => void;
   onToggleSidebar: () => void;
   showBurger: boolean;
   showLogo: boolean;
@@ -215,18 +234,27 @@ function TopBar({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <RoleSwitcher role={role} onSwitchRole={onSwitchRole} />
+        {onSwitchRole && <RoleSwitcher role={role} onSwitchRole={onSwitchRole} />}
         <ThemeToggle />
         <div className="hidden items-center gap-2 sm:flex">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-gradient text-xs font-bold text-white">
             {userName
-              .split(" ")
+              .split(/[@\s]/)
               .map((s) => s[0])
               .slice(0, 2)
-              .join("")}
+              .join("")
+              .toUpperCase()}
           </div>
-          <span className="text-sm font-medium text-content">{userName}</span>
+          <span className="max-w-[12rem] truncate text-sm font-medium text-content">{userName}</span>
         </div>
+        <button
+          onClick={onSignOut}
+          className="rounded-lg border border-line p-2 text-muted transition hover:border-klutch-blue-bright hover:text-content"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <Icon name="x" size={16} />
+        </button>
       </div>
     </header>
   );

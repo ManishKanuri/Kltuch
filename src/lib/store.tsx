@@ -51,13 +51,20 @@ export interface ToastMsg {
 
 interface StoreShape {
   // identity + navigation
+  // `role` is what the UI renders as — admins may temporarily "view as"
+  // coach/school for testing; `actualRole` is the real, authenticated role
+  // from the user's profiles row and is what every Supabase query/RLS check
+  // actually honors. Only an admin's `actualRole` is allowed to diverge.
   role: Role;
+  actualRole: Role;
   setRole: (r: Role) => void;
   active: ModuleKey;
   setActive: (m: ModuleKey) => void;
   currentCoachId: string;
   currentSchoolId: string;
   setCurrentSchoolId: (id: string) => void;
+  userEmail: string | null;
+  signOut: () => void;
 
   // data
   schools: School[];
@@ -111,9 +118,30 @@ const Ctx = createContext<StoreShape | null>(null);
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
 
-  const [role, setRole] = useState<Role>("admin");
+  // The authenticated role — defaults to "coach" (least privilege) until the
+  // real profile loads; never trust a default of "admin".
+  const [actualRole, setActualRole] = useState<Role>("coach");
+  const [actualCoachId, setActualCoachId] = useState<string>("");
+  const [actualSchoolId, setActualSchoolId] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // "View as" role — only ever diverges from actualRole when actualRole is
+  // admin (the Sidebar/RoleSwitcher use this for admins to preview other
+  // roles' screens; it never grants extra access, since every Supabase query
+  // and RLS policy keys off actualRole/actualCoachId/actualSchoolId, not this).
+  const [viewAsRole, setViewAsRole] = useState<Role | null>(null);
+  const role = viewAsRole ?? actualRole;
+  const setRole = useCallback(
+    (r: Role) => setViewAsRole(actualRole === "admin" ? r : null),
+    [actualRole]
+  );
+
   const [active, setActive] = useState<ModuleKey>("dashboard");
   const [currentSchoolId, setCurrentSchoolId] = useState<string>("");
+
+  const signOut = useCallback(() => {
+    supabase.auth.signOut();
+  }, [supabase]);
 
   // ---- Supabase-backed state (pilot scope) ----
   const [schools, setSchools] = useState<School[]>([]);
@@ -155,6 +183,47 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (id: number) => setToasts((t) => t.filter((x) => x.id !== id)),
     []
   );
+
+  // ---- load the authenticated user's profile (role, coach_id, school_id) ----
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+
+      setUserEmail(user.email ?? null);
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load profile:", error);
+        return;
+      }
+
+      setActualRole(profile.role);
+      setActualCoachId(profile.coach_id ?? "");
+      setActualSchoolId(profile.school_id ?? "");
+      if (profile.school_id) setCurrentSchoolId(profile.school_id);
+    }
+
+    loadProfile();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      loadProfile();
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   // ---- initial load from Supabase ----
   useEffect(() => {
@@ -404,12 +473,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<StoreShape>(
     () => ({
       role,
+      actualRole,
       setRole,
       active,
       setActive,
-      currentCoachId: seed.CURRENT_COACH_ID,
+      currentCoachId: actualCoachId || seed.CURRENT_COACH_ID,
       currentSchoolId,
       setCurrentSchoolId,
+      userEmail,
+      signOut,
       schools,
       coaches,
       classes,
@@ -442,8 +514,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       role,
+      actualRole,
+      setRole,
       active,
+      actualCoachId,
       currentSchoolId,
+      userEmail,
+      signOut,
       schools,
       coaches,
       classes,

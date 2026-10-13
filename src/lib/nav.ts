@@ -13,7 +13,8 @@ export type ModuleKey =
   | "student-assessment"
   | "equipment-log"
   | "school-portal"
-  | "coach-mobile";
+  | "coach-mobile"
+  | "team-access";
 
 export interface NavItem {
   key: ModuleKey;
@@ -64,6 +65,12 @@ export const ADMIN_NAV: NavSection[] = [
       { key: "coach-mobile", label: "Coach Mobile View", icon: "mobile" },
     ],
   },
+  {
+    label: "Admin",
+    items: [
+      { key: "team-access", label: "Team Access", icon: "coaches" },
+    ],
+  },
 ];
 
 export const PAGE_TITLES: Record<ModuleKey, string> = {
@@ -79,6 +86,7 @@ export const PAGE_TITLES: Record<ModuleKey, string> = {
   "equipment-log": "Equipment Log",
   "school-portal": "School Portal",
   "coach-mobile": "Coach Mobile View",
+  "team-access": "Team Access",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
