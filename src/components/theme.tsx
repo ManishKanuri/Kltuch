@@ -8,8 +8,8 @@ type Theme = "dark" | "light";
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("dark");
 
-  // The <head> script in layout.tsx already applied the saved theme before
-  // paint; read it back from the DOM so the icon matches what's on screen.
+  // The server already rendered the saved theme (layout.tsx reads the cookie);
+  // read it back from the DOM so the icon matches what's on screen.
   useEffect(() => {
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
@@ -17,7 +17,7 @@ export function ThemeToggle() {
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    localStorage.setItem("klutch-theme", next);
+    document.cookie = `klutch-theme=${next}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.classList.toggle("dark", next === "dark");
   }
 

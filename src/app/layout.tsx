@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,19 +29,18 @@ export const metadata: Metadata = {
     "KLUTCH SportsEd operations platform — coach attendance, sessions, sports analytics, student report cards, equipment, and school reports.",
 };
 
-// Runs before first paint so a saved "light" preference never flashes dark.
-const themeScript = `try{if(localStorage.getItem("klutch-theme")==="light")document.documentElement.classList.remove("dark")}catch(e){}`;
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Read from a cookie so the server renders the saved theme up front. An inline
+  // pre-paint <script> in <head> gets mismatched with scripts that browser
+  // extensions inject there, which breaks hydration.
+  const theme = (await cookies()).get("klutch-theme")?.value;
+
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+    <html lang="en" className={theme === "light" ? undefined : "dark"} suppressHydrationWarning>
       <body
         className={`${archivo.variable} ${instrumentSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
