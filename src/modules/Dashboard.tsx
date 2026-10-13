@@ -35,6 +35,7 @@ export default function Dashboard() {
     classById,
     schoolName,
     setActive,
+    live,
   } = useStore();
 
   const stats = useMemo(() => {
@@ -209,7 +210,17 @@ export default function Dashboard() {
       </div>
 
       <div>
-        <SectionTitle icon="clock">Today’s sessions</SectionTitle>
+        <SectionTitle
+          icon="clock"
+          right={
+            <span role="status" className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+              <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse-dot bg-hue-lime" : "bg-faint"}`} />
+              {live ? "Live" : "Connecting"}
+            </span>
+          }
+        >
+          Today’s sessions
+        </SectionTitle>
         <Card className="overflow-hidden">
           <Table>
             <THead>
@@ -235,7 +246,7 @@ export default function Dashboard() {
             </tbody>
           </Table>
           <div className="border-t border-line px-4 py-3 text-[12.5px] text-faint">
-            Coaches log attendance and sessions from their phones. Refresh to pull in the latest.
+            Coaches log attendance and sessions from their phones, and changes show up here as they happen.
           </div>
         </Card>
       </div>

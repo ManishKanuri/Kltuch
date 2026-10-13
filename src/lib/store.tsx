@@ -26,9 +26,11 @@ import type {
   SessionStatus,
   SkillKey,
 } from "./types";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import * as seed from "./seed";
 import type { ModuleKey } from "./nav";
 import { createClient } from "./supabase/client";
+import type { Database } from "./supabase/database.types";
 import {
   mapAssessment,
   mapCancellation,
@@ -47,6 +49,22 @@ import {
 // (overwritten by the real UUID once each insert's response comes back)
 let _idc = 1000;
 const nid = (p: string) => `${p}_${++_idc}`;
+
+// Our own optimistic insert and its realtime echo can land in either order,
+// so every merge is keyed by id to keep a row from appearing twice.
+function upsertById<T extends { id: string }>(list: T[], item: T, prepend = false): T[] {
+  if (list.some((x) => x.id === item.id)) return list.map((x) => (x.id === item.id ? item : x));
+  return prepend ? [item, ...list] : [...list, item];
+}
+
+function swapTemp<T extends { id: string }>(list: T[], tempId: string, real: T): T[] {
+  const rest = list.filter((x) => x.id !== real.id);
+  return rest.some((x) => x.id === tempId)
+    ? rest.map((x) => (x.id === tempId ? real : x))
+    : [...rest, real];
+}
+
+type Tables = Database["public"]["Tables"];
 
 export interface ToastMsg {
   id: number;
@@ -83,6 +101,8 @@ interface StoreShape {
   curriculum: CurriculumWeek[];
   fitnessAssessments: FitnessAssessment[];
   loading: boolean;
+  // True while the realtime channel is connected and streaming changes.
+  live: boolean;
 
   // actions
   toggleAttendance: (coachId: string) => void;
@@ -160,6 +180,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<CoachAttendance[]>([]);
   const [curriculum, setCurriculum] = useState<CurriculumWeek[]>([]);
   const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastSeq = useRef(0);
@@ -293,6 +314,65 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
+  // ---- live updates: merge other people's changes in as they happen ----
+  useEffect(() => {
+    const merge =
+      <R extends { id: string }, T extends { id: string }>(
+        setList: React.Dispatch<React.SetStateAction<T[]>>,
+        map: (row: R) => T
+      ) =>
+      (payload: RealtimePostgresChangesPayload<R>) => {
+        if (payload.eventType === "DELETE") {
+          const id = payload.old.id;
+          setList((prev) => prev.filter((item) => item.id !== id));
+        } else {
+          const item = map(payload.new);
+          setList((prev) => upsertById(prev, item));
+        }
+      };
+    const table = (name: keyof Tables) =>
+      ({ event: "*", schema: "public", table: name }) as const;
+
+    const channel = supabase
+      .channel("klutch-live")
+      .on<Tables["sessions"]["Row"]>("postgres_changes", table("sessions"), merge(setSessions, mapSession))
+      .on<Tables["coach_attendance"]["Row"]>("postgres_changes", table("coach_attendance"), merge(setAttendance, mapCoachAttendance))
+      .on<Tables["assessments"]["Row"]>("postgres_changes", table("assessments"), merge(setAssessments, mapAssessment))
+      .on<Tables["equipment"]["Row"]>("postgres_changes", table("equipment"), merge(setEquipment, mapEquipment))
+      .on<Tables["coaches"]["Row"]>("postgres_changes", table("coaches"), merge(setCoaches, mapCoach))
+      .on<Tables["curriculum"]["Row"]>("postgres_changes", table("curriculum"), (payload) => {
+        if (payload.eventType === "DELETE") {
+          const classId = payload.old.class_id;
+          setCurriculum((prev) => prev.filter((c) => c.classId !== classId));
+          return;
+        }
+        const item = mapCurriculum(payload.new);
+        setCurriculum((prev) =>
+          prev.some((c) => c.classId === item.classId)
+            ? prev.map((c) => (c.classId === item.classId ? item : c))
+            : [...prev, item]
+        );
+      })
+      .on<Tables["cancellations"]["Row"]>("postgres_changes", table("cancellations"), (payload) => {
+        merge(setCancellations, mapCancellation)(payload);
+        if (payload.eventType !== "INSERT") return;
+        // cancellation_rows is a view, which Realtime can't stream; fetch the new row.
+        supabase
+          .from("cancellation_rows")
+          .select("*")
+          .eq("id", payload.new.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setCancellationRows((prev) => upsertById(prev, mapCancellationRow(data), true));
+          });
+      })
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
+
   const schoolName = useCallback(
     (id: string) => schools.find((s) => s.id === id)?.name ?? "—",
     [schools]
@@ -342,9 +422,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             setAttendance((prev) => prev.filter((a) => a.id !== tempId));
             return;
           }
-          setAttendance((prev) =>
-            prev.map((a) => (a.id === tempId ? mapCoachAttendance(data) : a))
-          );
+          setAttendance((prev) => swapTemp(prev, tempId, mapCoachAttendance(data)));
         });
     },
     [attendance, supabase]
@@ -437,9 +515,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             setCancellationRows((prev) => prev.filter((r) => r.id !== tempRowId));
             return;
           }
-          setCancellations((prev) =>
-            prev.map((c) => (c.id === tempId ? mapCancellation(data) : c))
-          );
+          setCancellations((prev) => swapTemp(prev, tempId, mapCancellation(data)));
           // Refresh the denormalized view row with its real id, keeping the
           // optimistic date/school/class fields (the view join is identical).
           supabase
@@ -449,9 +525,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             .single()
             .then(({ data: rowData }) => {
               if (rowData) {
-                setCancellationRows((prev) =>
-                  prev.map((r) => (r.id === tempRowId ? mapCancellationRow(rowData) : r))
-                );
+                setCancellationRows((prev) => swapTemp(prev, tempRowId, mapCancellationRow(rowData)));
               }
             });
         });
@@ -480,9 +554,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             setAssessments((prev) => prev.filter((x) => x.id !== tempId));
             return;
           }
-          setAssessments((prev) =>
-            prev.map((x) => (x.id === tempId ? mapAssessment(data) : x))
-          );
+          setAssessments((prev) => swapTemp(prev, tempId, mapAssessment(data)));
         });
     },
     [supabase]
@@ -526,9 +598,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             setEquipment((prev) => prev.filter((x) => x.id !== tempId));
             return;
           }
-          setEquipment((prev) =>
-            prev.map((x) => (x.id === tempId ? mapEquipment(data) : x))
-          );
+          setEquipment((prev) => swapTemp(prev, tempId, mapEquipment(data)));
         });
     },
     [supabase]
@@ -575,9 +645,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             setCoaches((prev) => prev.filter((x) => x.id !== tempId));
             return;
           }
-          setCoaches((prev) =>
-            prev.map((x) => (x.id === tempId ? mapCoach(data) : x))
-          );
+          setCoaches((prev) => swapTemp(prev, tempId, mapCoach(data)));
         });
     },
     [supabase]
@@ -625,6 +693,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       curriculum,
       fitnessAssessments,
       loading,
+      live,
       toggleAttendance,
       setSessionStatus,
       setCurriculumWeek,
@@ -664,6 +733,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       curriculum,
       fitnessAssessments,
       loading,
+      live,
       toggleAttendance,
       setSessionStatus,
       setCurriculumWeek,
