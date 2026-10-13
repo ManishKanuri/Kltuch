@@ -60,11 +60,10 @@ export default function CoachAttendance() {
                 </div>
               </div>
               <button
-                onClick={() => {
-                  toggleAttendance(c.id);
-                  toast(
-                    present ? `${c.name} marked absent` : `${c.name} marked present`
-                  );
+                onClick={async () => {
+                  if (await toggleAttendance(c.id)) {
+                    toast(present ? `${c.name} marked absent` : `${c.name} marked present`);
+                  }
                 }}
                 className={`relative h-9 w-16 rounded-full transition-colors ${
                   present ? "bg-klutch-field" : "bg-content/20"

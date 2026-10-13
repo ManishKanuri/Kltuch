@@ -57,15 +57,21 @@ export default function StudentAssessment() {
     if (!classId && classes.length) setClassId(classes[0].id);
   }, [classId, classes]);
 
-  function submit() {
-    if (!name.trim()) return;
-    addAssessment({
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    const ok = await addAssessment({
       studentName: name.trim(),
       classId,
       term,
       ratings,
       date: todayISO(),
     });
+    setSaving(false);
+    // On failure the form stays open with what was entered.
+    if (!ok) return;
     toast(`Assessment saved for ${name.trim()}`);
     setName("");
     setRatings(emptyRatings());
@@ -135,8 +141,8 @@ export default function StudentAssessment() {
             ))}
           </div>
           <div className="mt-3">
-            <PrimaryButton icon="check" onClick={submit}>
-              Save assessment
+            <PrimaryButton icon="check" onClick={submit} disabled={saving}>
+              {saving ? "Saving…" : "Save assessment"}
             </PrimaryButton>
           </div>
         </Card>
@@ -190,8 +196,9 @@ export default function StudentAssessment() {
         <ReportCard
           a={reportFor}
           onClose={() => setReportFor(null)}
-          onSave={(r) => {
-            updateAssessment(reportFor.id, r);
+          onSave={async (r) => {
+            // On failure the card stays open with the edited stars.
+            if (!(await updateAssessment(reportFor.id, r))) return;
             toast(`${reportFor.studentName}'s report card updated`);
             setReportFor(null);
           }}
@@ -208,7 +215,7 @@ function ReportCard({
 }: {
   a: Assessment;
   onClose: () => void;
-  onSave: (r: Record<SkillKey, number>) => void;
+  onSave: (r: Record<SkillKey, number>) => Promise<void>;
 }) {
   const { classes, assessments, schoolName, toast } = useStore();
   const cls = classes.find((c) => c.id === a.classId);
@@ -222,6 +229,14 @@ function ReportCard({
 
   const cardRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+
+  async function saveReport() {
+    if (savingReport) return;
+    setSavingReport(true);
+    await onSave(r);
+    setSavingReport(false);
+  }
 
   async function downloadPdf() {
     if (!cardRef.current || saving) return;
@@ -345,8 +360,8 @@ function ReportCard({
             <OutlineButton icon="download" onClick={downloadPdf}>
               {saving ? "Generating…" : "PDF"}
             </OutlineButton>
-            <PrimaryButton icon="check" onClick={() => onSave(r)}>
-              Save report
+            <PrimaryButton icon="check" onClick={saveReport} disabled={savingReport}>
+              {savingReport ? "Saving…" : "Save report"}
             </PrimaryButton>
           </div>
         </div>

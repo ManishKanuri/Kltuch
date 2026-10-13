@@ -9,11 +9,12 @@ import {
   ROLE_LABEL,
   type ModuleKey,
 } from "@/lib/nav";
+import type { StartupStatus } from "@/lib/store";
 import type { Role } from "@/lib/types";
 import { Icon } from "./icons";
 import { Logo, LogoMark } from "./Logo";
 import { ThemeToggle } from "./theme";
-import { ToastHost } from "./ui";
+import { OutlineButton, PrimaryButton, ToastHost } from "./ui";
 
 import Dashboard from "@/modules/Dashboard";
 import SportsAnalytics from "@/modules/SportsAnalytics";
@@ -65,6 +66,7 @@ function ModuleView({ m }: { m: ModuleKey }) {
 
 export default function Shell() {
   const {
+    status,
     role,
     actualRole,
     setRole,
@@ -91,6 +93,8 @@ export default function Shell() {
     setActive(m);
     setSidebarOpen(false);
   }
+
+  if (status !== "ready") return <StartupScreen status={status} onSignOut={signOut} />;
 
   const isAdmin = role === "admin";
   const shownModule = isAdmin ? active : ROLE_HOME[role];
@@ -129,6 +133,49 @@ export default function Shell() {
 
       <ToastHost />
     </div>
+  );
+}
+
+// Shown until the user's role and data have loaded, so nobody sees another
+// role's screens or empty tables first; and in place of the app if they can't load.
+function StartupScreen({
+  status,
+  onSignOut,
+}: {
+  status: Exclude<StartupStatus, "ready">;
+  onSignOut: () => void;
+}) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
+      <LogoMark size={44} />
+      {status === "loading" ? (
+        <p role="status" className="mt-5 flex items-center gap-2 text-sm text-muted">
+          <span className="h-2 w-2 animate-pulse-dot rounded-full bg-accent motion-reduce:animate-none" />
+          Loading your dashboard…
+        </p>
+      ) : (
+        <div role="alert" className="mt-6 max-w-sm">
+          <h1 className="font-display text-xl font-extrabold tracking-[-0.015em] text-content">
+            {status === "no-profile" ? "This account isn’t set up yet" : "Couldn’t load your data"}
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            {status === "no-profile"
+              ? "Ask a KLUTCH admin to invite you again."
+              : "Check your connection, then try again."}
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            {status === "error" && (
+              <PrimaryButton onClick={() => window.location.reload()}>
+                Try again
+              </PrimaryButton>
+            )}
+            <OutlineButton icon="log-out" onClick={onSignOut}>
+              Sign out
+            </OutlineButton>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
 

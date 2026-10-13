@@ -32,19 +32,25 @@ export default function CancellationLog() {
   const [cancelledBy, setCancelledBy] = useState<CancelledBy>("School");
   const [reason, setReason] = useState(CANCEL_REASONS[0]);
   const [reschedule, setReschedule] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const openSessions = useMemo(
     () => sessions.filter((s) => s.status !== "Cancelled"),
     [sessions]
   );
 
-  function submit() {
+  async function submit() {
     if (!sessionId) {
       toast("Pick a session first");
       return;
     }
-    logCancellation(sessionId, cancelledBy, reason, reschedule || null);
+    if (saving) return;
     const cls = classById(sessions.find((s) => s.id === sessionId)!.classId);
+    setSaving(true);
+    const ok = await logCancellation(sessionId, cancelledBy, reason, reschedule || null);
+    setSaving(false);
+    // On failure the form stays open with what was picked.
+    if (!ok) return;
     toast(`${cls?.className ?? "Session"} cancellation logged`);
     setOpen(false);
     setSessionId("");
@@ -115,8 +121,8 @@ export default function CancellationLog() {
             </Field>
           </div>
           <div className="mt-3">
-            <PrimaryButton icon="check" onClick={submit}>
-              Save cancellation
+            <PrimaryButton icon="check" onClick={submit} disabled={saving}>
+              {saving ? "Saving…" : "Save cancellation"}
             </PrimaryButton>
           </div>
         </Card>

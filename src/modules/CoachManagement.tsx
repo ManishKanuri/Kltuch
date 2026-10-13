@@ -35,15 +35,21 @@ export default function CoachManagement() {
     if (!schoolId && schools.length) setSchoolId(schools[0].id);
   }, [schoolId, schools]);
 
-  function submit() {
-    if (!name.trim()) return;
-    addCoach({
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    const ok = await addCoach({
       name: name.trim(),
       phone: phone.trim() || "+91 —",
       assignedSchoolId: schoolId,
       status: "Active",
       rating: 3,
     });
+    setSaving(false);
+    // On failure the form stays open with what was typed.
+    if (!ok) return;
     toast(`Coach ${name.trim()} added`);
     setName("");
     setPhone("");
@@ -92,8 +98,8 @@ export default function CoachManagement() {
                 </option>
               ))}
             </select>
-            <PrimaryButton icon="check" onClick={submit}>
-              Save coach
+            <PrimaryButton icon="check" onClick={submit} disabled={saving}>
+              {saving ? "Saving…" : "Save coach"}
             </PrimaryButton>
           </div>
         </Card>
@@ -126,9 +132,8 @@ export default function CoachManagement() {
                   <Td>
                     <StarRating
                       value={c.rating}
-                      onChange={(v) => {
-                        setCoachRating(c.id, v);
-                        toast(`${c.name} rated ${v}/5`);
+                      onChange={async (v) => {
+                        if (await setCoachRating(c.id, v)) toast(`${c.name} rated ${v}/5`);
                       }}
                     />
                   </Td>

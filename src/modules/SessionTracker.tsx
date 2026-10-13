@@ -156,9 +156,9 @@ export default function SessionTracker() {
                 <Td>
                   <select
                     value={s.status}
-                    onChange={(e) => {
-                      setSessionStatus(s.id, e.target.value as SessionStatus);
-                      toast(`${cls?.className} marked ${e.target.value}`);
+                    onChange={async (e) => {
+                      const next = e.target.value as SessionStatus;
+                      if (await setSessionStatus(s.id, next)) toast(`${cls?.className} marked ${next}`);
                     }}
                     aria-label={`Update status for ${cls?.className} on ${s.date}`}
                     className="rounded-sm border border-line bg-surface px-2 py-1 text-xs text-content"

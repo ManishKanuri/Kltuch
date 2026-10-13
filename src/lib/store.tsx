@@ -27,7 +27,11 @@ import type {
   SessionStatus,
   SkillKey,
 } from "./types";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import {
+  isAuthRetryableFetchError,
+  type PostgrestError,
+  type RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 import { addDays, isoWeekday, todayISO } from "./dates";
 import type { ModuleKey } from "./nav";
 import { createClient } from "./supabase/client";
@@ -51,6 +55,7 @@ import {
 // (overwritten by the real UUID once each insert's response comes back)
 let _idc = 1000;
 const nid = (p: string) => `${p}_${++_idc}`;
+const isTempId = (id: string) => /^[a-z]+_\d+$/.test(id);
 
 // Our own optimistic insert and its realtime echo can land in either order,
 // so every merge is keyed by id to keep a row from appearing twice.
@@ -66,7 +71,41 @@ function swapTemp<T extends { id: string }>(list: T[], tempId: string, real: T):
     : [...rest, real];
 }
 
+// Puts back the old values after a failed save, unless a newer change (another
+// tap, or someone else's edit arriving live) has replaced ours in the meantime.
+function revertIfUnchanged<T extends { id: string }>(
+  list: T[],
+  id: string,
+  sent: Partial<T>,
+  previous: Partial<T>
+): T[] {
+  return list.map((item) => {
+    if (item.id !== id) return item;
+    const stillOurs = (Object.keys(sent) as (keyof T)[]).every((key) => item[key] === sent[key]);
+    return stillOurs ? { ...item, ...previous } : item;
+  });
+}
+
 type Tables = Database["public"]["Tables"];
+
+// The API returns at most 1,000 rows per request (Supabase's max_rows) and a
+// plain select silently stops there, so read every table in pages.
+const PAGE_SIZE = 1000;
+async function selectAllPages<Row>(
+  page: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return rows;
+  }
+}
+
+// Until the user's profile and the first data load arrive, the app shows a
+// loading screen rather than guessing a role and flashing the wrong screens.
+export type StartupStatus = "loading" | "ready" | "no-profile" | "error";
 
 export interface ToastMsg {
   id: number;
@@ -102,30 +141,31 @@ interface StoreShape {
   attendance: CoachAttendance[];
   curriculum: CurriculumWeek[];
   fitnessAssessments: FitnessAssessment[];
-  loading: boolean;
+  status: StartupStatus;
   // True while the realtime channel is connected and streaming changes.
   live: boolean;
 
-  // actions
-  toggleAttendance: (coachId: string) => void;
-  setSessionStatus: (sessionId: string, status: SessionStatus) => void;
-  setCurriculumWeek: (sessionId: string, week: number) => void;
+  // actions: each shows its change at once and resolves true once the
+  // database has saved it. On failure the change is undone and a toast says so.
+  toggleAttendance: (coachId: string) => Promise<boolean>;
+  setSessionStatus: (sessionId: string, status: SessionStatus) => Promise<boolean>;
+  setCurriculumWeek: (sessionId: string, week: number) => Promise<boolean>;
   logCancellation: (
     sessionId: string,
     cancelledBy: CancelledBy,
     reason: string,
     rescheduledDate: string | null
-  ) => void;
-  addAssessment: (a: Omit<Assessment, "id">) => void;
-  updateAssessment: (id: string, ratings: Record<SkillKey, number>) => void;
-  addEquipment: (e: Omit<Equipment, "id">) => void;
+  ) => Promise<boolean>;
+  addAssessment: (a: Omit<Assessment, "id">) => Promise<boolean>;
+  updateAssessment: (id: string, ratings: Record<SkillKey, number>) => Promise<boolean>;
+  addEquipment: (e: Omit<Equipment, "id">) => Promise<boolean>;
   updateEquipmentStatus: (
     id: string,
     condition: Equipment["condition"],
     status: Equipment["status"]
-  ) => void;
-  addCoach: (c: Omit<Coach, "id">) => void;
-  setCoachRating: (id: string, rating: number) => void;
+  ) => Promise<boolean>;
+  addCoach: (c: Omit<Coach, "id">) => Promise<boolean>;
+  setCoachRating: (id: string, rating: number) => Promise<boolean>;
 
   // timetable + scheduling
   schedule: ClassSlot[];
@@ -172,8 +212,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ModuleKey>("dashboard");
   const [currentSchoolId, setCurrentSchoolId] = useState<string>("");
 
-  const signOut = useCallback(() => {
-    supabase.auth.signOut();
+  const signOut = useCallback(async () => {
+    // Signs out this device only; the user's other devices stay signed in.
+    await supabase.auth.signOut({ scope: "local" });
+    // A full page load drops everything this page holds in memory.
+    window.location.assign("/login");
   }, [supabase]);
 
   // ---- Supabase-backed state ----
@@ -189,7 +232,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<CoachAttendance[]>([]);
   const [curriculum, setCurriculum] = useState<CurriculumWeek[]>([]);
   const [schedule, setSchedule] = useState<ClassSlot[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [profileStatus, setProfileStatus] = useState<StartupStatus>("loading");
+  const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
+  const status: StartupStatus =
+    profileStatus === "no-profile"
+      ? "no-profile"
+      : profileStatus === "error" || dataStatus === "error"
+        ? "error"
+        : profileStatus === "ready" && dataStatus === "ready"
+          ? "ready"
+          : "loading";
   const [live, setLive] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
@@ -216,8 +268,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     async function loadProfile() {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
-      if (cancelled || !user) return;
+      if (cancelled) return;
+      if (!user) {
+        if (isAuthRetryableFetchError(userError)) {
+          setProfileStatus((prev) => (prev === "ready" ? prev : "error"));
+        } else {
+          // Signed out (here or in another tab), or the session ran out.
+          window.location.assign("/login");
+        }
+        return;
+      }
 
       setUserEmail(user.email ?? null);
 
@@ -225,10 +287,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       if (cancelled) return;
-      if (error) {
-        console.error("Failed to load profile:", error);
+      if (error || !profile) {
+        console.error("Failed to load profile:", error ?? "no profile row");
+        // This reruns on every token refresh; a failed rerun shouldn't take
+        // away a session that has already loaded.
+        setProfileStatus((prev) => (prev === "ready" ? prev : error ? "error" : "no-profile"));
         return;
       }
 
@@ -236,12 +301,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setActualCoachId(profile.coach_id ?? "");
       setActualSchoolId(profile.school_id ?? "");
       if (profile.school_id) setCurrentSchoolId(profile.school_id);
+      setProfileStatus("ready");
     }
 
     loadProfile();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
-      loadProfile();
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") window.location.assign("/login");
+      else loadProfile();
     });
 
     return () => {
@@ -255,71 +322,57 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
       const [
-        schoolsRes,
-        coachesRes,
-        classesRes,
-        assessmentsRes,
-        fitnessRes,
-        sessionsRes,
-        cancellationsRes,
-        cancellationRowsRes,
-        equipmentRes,
-        attendanceRes,
-        curriculumRes,
-        scheduleRes,
+        schoolRows,
+        coachRows,
+        classRows,
+        assessmentRows,
+        fitnessRows,
+        sessionRows,
+        cancellationRowsDb,
+        cancellationViewRows,
+        equipmentRows,
+        attendanceRows,
+        curriculumRows,
+        scheduleRows,
       ] = await Promise.all([
-        supabase.from("schools").select("*"),
-        supabase.from("coaches").select("*"),
-        supabase.from("classes").select("*"),
-        supabase.from("assessments").select("*"),
-        supabase.from("fitness_assessments").select("*"),
-        supabase.from("sessions").select("*"),
-        supabase.from("cancellations").select("*"),
-        supabase.from("cancellation_rows").select("*"),
-        supabase.from("equipment").select("*"),
-        supabase.from("coach_attendance").select("*"),
-        supabase.from("curriculum").select("*"),
-        supabase.from("class_schedule").select("*"),
+        selectAllPages((a, b) => supabase.from("schools").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("coaches").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("classes").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("assessments").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("fitness_assessments").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("sessions").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("cancellations").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("cancellation_rows").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("equipment").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("coach_attendance").select("*").order("id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("curriculum").select("*").order("class_id").range(a, b)),
+        selectAllPages((a, b) => supabase.from("class_schedule").select("*").order("id").range(a, b)),
       ]);
 
       if (cancelled) return;
 
-      if (schoolsRes.error) throw schoolsRes.error;
-      if (coachesRes.error) throw coachesRes.error;
-      if (classesRes.error) throw classesRes.error;
-      if (assessmentsRes.error) throw assessmentsRes.error;
-      if (fitnessRes.error) throw fitnessRes.error;
-      if (sessionsRes.error) throw sessionsRes.error;
-      if (cancellationsRes.error) throw cancellationsRes.error;
-      if (cancellationRowsRes.error) throw cancellationRowsRes.error;
-      if (equipmentRes.error) throw equipmentRes.error;
-      if (attendanceRes.error) throw attendanceRes.error;
-      if (curriculumRes.error) throw curriculumRes.error;
-      if (scheduleRes.error) throw scheduleRes.error;
-
-      const mappedSchools = schoolsRes.data.map(mapSchool);
+      const mappedSchools = schoolRows.map(mapSchool);
       setSchools(mappedSchools);
-      setCoaches(coachesRes.data.map(mapCoach));
-      setClasses(classesRes.data.map(mapClass));
-      setAssessments(assessmentsRes.data.map(mapAssessment));
-      setFitnessAssessments(fitnessRes.data.map(mapFitnessAssessment));
-      setSessions(sessionsRes.data.map(mapSession));
-      setCancellations(cancellationsRes.data.map(mapCancellation));
-      setCancellationRows(cancellationRowsRes.data.map(mapCancellationRow));
-      setEquipment(equipmentRes.data.map(mapEquipment));
-      setAttendance(attendanceRes.data.map(mapCoachAttendance));
-      setCurriculum(curriculumRes.data.map(mapCurriculum));
-      setSchedule(scheduleRes.data.map(mapClassSlot));
+      setCoaches(coachRows.map(mapCoach));
+      setClasses(classRows.map(mapClass));
+      setAssessments(assessmentRows.map(mapAssessment));
+      setFitnessAssessments(fitnessRows.map(mapFitnessAssessment));
+      setSessions(sessionRows.map(mapSession));
+      setCancellations(cancellationRowsDb.map(mapCancellation));
+      setCancellationRows(cancellationViewRows.map(mapCancellationRow));
+      setEquipment(equipmentRows.map(mapEquipment));
+      setAttendance(attendanceRows.map(mapCoachAttendance));
+      setCurriculum(curriculumRows.map(mapCurriculum));
+      setSchedule(scheduleRows.map(mapClassSlot));
       setCurrentSchoolId((prev) => prev || mappedSchools[0]?.id || "");
-      setLoading(false);
+      setDataStatus("ready");
     }
 
     load().catch((err) => {
       if (!cancelled) {
         console.error("Failed to load data from Supabase:", err);
-        setLoading(false);
+        setDataStatus("error");
       }
     });
 
@@ -404,110 +457,139 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [classById]
   );
 
-  const toggleAttendance = useCallback(
-    (coachId: string) => {
-      const existing = attendance.find(
-        (a) => a.coachId === coachId && a.date === todayISO()
+  // Every save shows on screen straight away. When the database doesn't save
+  // it, the caller undoes the change and this says so.
+  const saveFailed = useCallback(
+    (what: string, error: PostgrestError | null) => {
+      console.error(`Couldn't ${what}:`, error ?? "no row was changed");
+      // A request that never reached the database comes back without an error code.
+      toast(
+        error && !error.code
+          ? `Couldn't ${what}. Check your connection and try again.`
+          : `Couldn't ${what}. Refresh the page and try again.`
       );
-      if (existing) {
-        const nextPresent = !existing.present;
-        setAttendance((prev) =>
-          prev.map((a) => (a.id === existing.id ? { ...a, present: nextPresent } : a))
-        );
-        supabase
-          .from("coach_attendance")
-          .update({ present: nextPresent })
-          .eq("id", existing.id)
-          .then(({ error }) => {
-            if (error) console.error("Failed to update attendance:", error);
-          });
-        return;
-      }
-      const tempId = nid("at");
-      setAttendance((prev) => [...prev, { id: tempId, coachId, date: todayISO(), present: true }]);
-      supabase
-        .from("coach_attendance")
-        .insert({ coach_id: coachId, date: todayISO(), present: true })
-        .select("*")
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error("Failed to save attendance:", error);
-            setAttendance((prev) => prev.filter((a) => a.id !== tempId));
-            return;
-          }
-          setAttendance((prev) => swapTemp(prev, tempId, mapCoachAttendance(data)));
-        });
     },
-    [attendance, supabase]
+    [toast]
+  );
+
+  // Changes fields on one row at once, then saves them. An update that changes
+  // no row has failed too: that's how row-level security refuses one.
+  const saveUpdate = useCallback(
+    async <T extends { id: string }>(
+      what: string,
+      setList: React.Dispatch<React.SetStateAction<T[]>>,
+      item: T | undefined,
+      changes: Partial<T>,
+      send: () => PromiseLike<{ data: unknown[] | null; error: PostgrestError | null }>
+    ) => {
+      if (!item) return false;
+      const previous: Partial<T> = {};
+      for (const key of Object.keys(changes) as (keyof T)[]) previous[key] = item[key];
+      setList((list) => list.map((x) => (x.id === item.id ? { ...x, ...changes } : x)));
+      const { data, error } = await send();
+      if (!error && data?.length) return true;
+      setList((list) => revertIfUnchanged(list, item.id, changes, previous));
+      saveFailed(what, error);
+      return false;
+    },
+    [saveFailed]
+  );
+
+  // Adds a row at once under a temporary id, then swaps in the saved row.
+  const saveInsert = useCallback(
+    async <T extends { id: string }, Row>(
+      what: string,
+      setList: React.Dispatch<React.SetStateAction<T[]>>,
+      temp: T,
+      send: () => PromiseLike<{ data: Row | null; error: PostgrestError | null }>,
+      map: (row: Row) => T
+    ) => {
+      setList((list) => [...list, temp]);
+      const { data, error } = await send();
+      if (error || !data) {
+        setList((list) => list.filter((x) => x.id !== temp.id));
+        saveFailed(what, error);
+        return false;
+      }
+      setList((list) => swapTemp(list, temp.id, map(data)));
+      return true;
+    },
+    [saveFailed]
+  );
+
+  const toggleAttendance = useCallback(
+    async (coachId: string) => {
+      const today = todayISO();
+      const existing = attendance.find((a) => a.coachId === coachId && a.date === today);
+      if (existing) {
+        // The first tap is still saving, so its row has no real id to update yet.
+        if (isTempId(existing.id)) return false;
+        const present = !existing.present;
+        return saveUpdate("save attendance", setAttendance, existing, { present }, () =>
+          supabase.from("coach_attendance").update({ present }).eq("id", existing.id).select("id")
+        );
+      }
+      return saveInsert(
+        "save attendance",
+        setAttendance,
+        { id: nid("at"), coachId, date: today, present: true },
+        () =>
+          supabase
+            .from("coach_attendance")
+            .insert({ coach_id: coachId, date: today, present: true })
+            .select("*")
+            .single(),
+        mapCoachAttendance
+      );
+    },
+    [attendance, supabase, saveUpdate, saveInsert]
   );
 
   const setSessionStatus = useCallback(
-    (sessionId: string, status: SessionStatus) => {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, status } : s))
-      );
-      supabase
-        .from("sessions")
-        .update({ status })
-        .eq("id", sessionId)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update session status:", error);
-        });
-    },
-    [supabase]
+    (sessionId: string, status: SessionStatus) =>
+      saveUpdate("update the session", setSessions, sessions.find((s) => s.id === sessionId), { status }, () =>
+        supabase.from("sessions").update({ status }).eq("id", sessionId).select("id")
+      ),
+    [sessions, supabase, saveUpdate]
   );
 
   const setCurriculumWeek = useCallback(
-    (sessionId: string, week: number) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId ? { ...s, curriculumWeek: week } : s
-        )
-      );
-      supabase
-        .from("sessions")
-        .update({ curriculum_week: week })
-        .eq("id", sessionId)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update curriculum week:", error);
-        });
-    },
-    [supabase]
+    (sessionId: string, week: number) =>
+      saveUpdate(
+        "update the curriculum week",
+        setSessions,
+        sessions.find((s) => s.id === sessionId),
+        { curriculumWeek: week },
+        () => supabase.from("sessions").update({ curriculum_week: week }).eq("id", sessionId).select("id")
+      ),
+    [sessions, supabase, saveUpdate]
   );
 
   const logCancellation = useCallback(
-    (
+    async (
       sessionId: string,
       cancelledBy: CancelledBy,
       reason: string,
       rescheduledDate: string | null
     ) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId ? { ...s, status: "Cancelled" as const } : s
-        )
-      );
-      supabase
-        .from("sessions")
-        .update({ status: "Cancelled" })
-        .eq("id", sessionId)
-        .then(({ error }) => {
-          if (error) console.error("Failed to cancel session:", error);
-        });
-
+      const sess = sessions.find((s) => s.id === sessionId);
+      if (!sess) return false;
+      const cls = classes.find((c) => c.id === sess.classId);
       const tempId = nid("ca");
+      const tempRowId = nid("car");
+      // Saving the cancellation also marks the session Cancelled, in the same
+      // transaction (the mark_session_cancelled trigger), so show both now.
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, status: "Cancelled" as const } : s))
+      );
       setCancellations((prev) => [
         ...prev,
         { id: tempId, sessionId, cancelledBy, reason, rescheduledDate },
       ]);
-      const sess = sessions.find((s) => s.id === sessionId);
-      const cls = sess ? classes.find((c) => c.id === sess.classId) : undefined;
-      const tempRowId = nid("car");
       setCancellationRows((prev) => [
         {
           id: tempRowId,
-          date: sess?.date ?? todayISO(),
+          date: sess.date,
           schoolId: cls?.schoolId ?? "",
           className: cls?.className ?? "—",
           cancelledBy,
@@ -517,194 +599,159 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
 
-      supabase
+      const { data, error } = await supabase
         .from("cancellations")
         .insert({ session_id: sessionId, cancelled_by: cancelledBy, reason, rescheduled_date: rescheduledDate })
         .select("*")
+        .single();
+      if (error) {
+        setSessions((prev) =>
+          revertIfUnchanged(prev, sessionId, { status: "Cancelled" }, { status: sess.status })
+        );
+        setCancellations((prev) => prev.filter((c) => c.id !== tempId));
+        setCancellationRows((prev) => prev.filter((r) => r.id !== tempRowId));
+        saveFailed("log the cancellation", error);
+        return false;
+      }
+      setCancellations((prev) => swapTemp(prev, tempId, mapCancellation(data)));
+
+      // Refresh the denormalized view row with its real id, keeping the
+      // optimistic date/school/class fields (the view join is identical).
+      supabase
+        .from("cancellation_rows")
+        .select("*")
+        .eq("id", data.id)
         .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error("Failed to log cancellation:", error);
-            setCancellations((prev) => prev.filter((c) => c.id !== tempId));
-            setCancellationRows((prev) => prev.filter((r) => r.id !== tempRowId));
-            return;
+        .then(({ data: rowData }) => {
+          if (rowData) {
+            setCancellationRows((prev) => swapTemp(prev, tempRowId, mapCancellationRow(rowData)));
           }
-          setCancellations((prev) => swapTemp(prev, tempId, mapCancellation(data)));
-          if (rescheduledDate && sess) {
-            supabase
-              .from("sessions")
-              .upsert(
-                {
-                  class_id: sess.classId,
-                  coach_id: sess.coachId,
-                  date: rescheduledDate,
-                  start_time: sess.startTime,
-                  status: "Pending",
-                  curriculum_week: sess.curriculumWeek,
-                },
-                { onConflict: "class_id,date,start_time", ignoreDuplicates: true }
-              )
-              .select("*")
-              .then(({ data: made, error: makeupError }) => {
-                if (makeupError) {
-                  toast("Cancellation logged, but the makeup session couldn't be added. Add it from the Timetable.");
-                  return;
-                }
-                if (made?.length) {
-                  setSessions((prev) => made.reduce((list, row) => upsertById(list, mapSession(row)), prev));
-                  toast(`Makeup session added for ${rescheduledDate}`);
-                }
-              });
-          }
-          // Refresh the denormalized view row with its real id, keeping the
-          // optimistic date/school/class fields (the view join is identical).
-          supabase
-            .from("cancellation_rows")
-            .select("*")
-            .eq("id", data.id)
-            .single()
-            .then(({ data: rowData }) => {
-              if (rowData) {
-                setCancellationRows((prev) => swapTemp(prev, tempRowId, mapCancellationRow(rowData)));
-              }
-            });
         });
+
+      if (rescheduledDate) {
+        supabase
+          .from("sessions")
+          .upsert(
+            {
+              class_id: sess.classId,
+              coach_id: sess.coachId,
+              date: rescheduledDate,
+              start_time: sess.startTime,
+              status: "Pending",
+              curriculum_week: sess.curriculumWeek,
+            },
+            { onConflict: "class_id,date,start_time", ignoreDuplicates: true }
+          )
+          .select("*")
+          .then(({ data: made, error: makeupError }) => {
+            if (makeupError) {
+              console.error("Couldn't add the makeup session:", makeupError);
+              toast("Cancellation logged, but the makeup session couldn't be added. Add it from the Timetable.");
+              return;
+            }
+            if (made?.length) {
+              setSessions((prev) => made.reduce((list, row) => upsertById(list, mapSession(row)), prev));
+              toast(`Makeup session added for ${rescheduledDate}`);
+            }
+          });
+      }
+      return true;
     },
-    [sessions, classes, supabase, toast]
+    [sessions, classes, supabase, toast, saveFailed]
   );
 
   const addAssessment = useCallback(
-    (a: Omit<Assessment, "id">) => {
-      const tempId = nid("as");
-      setAssessments((prev) => [...prev, { ...a, id: tempId }]);
-      supabase
-        .from("assessments")
-        .insert({
-          student_name: a.studentName,
-          class_id: a.classId,
-          term: a.term,
-          ratings: a.ratings,
-          date: a.date,
-        })
-        .select("*")
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error("Failed to save assessment:", error);
-            setAssessments((prev) => prev.filter((x) => x.id !== tempId));
-            return;
-          }
-          setAssessments((prev) => swapTemp(prev, tempId, mapAssessment(data)));
-        });
-    },
-    [supabase]
+    (a: Omit<Assessment, "id">) =>
+      saveInsert(
+        "save the assessment",
+        setAssessments,
+        { ...a, id: nid("as") },
+        () =>
+          supabase
+            .from("assessments")
+            .insert({
+              student_name: a.studentName,
+              class_id: a.classId,
+              term: a.term,
+              ratings: a.ratings,
+              date: a.date,
+            })
+            .select("*")
+            .single(),
+        mapAssessment
+      ),
+    [supabase, saveInsert]
   );
 
   const updateAssessment = useCallback(
-    (id: string, ratings: Record<SkillKey, number>) => {
-      setAssessments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, ratings } : a))
-      );
-      supabase
-        .from("assessments")
-        .update({ ratings })
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update assessment:", error);
-        });
-    },
-    [supabase]
+    (id: string, ratings: Record<SkillKey, number>) =>
+      saveUpdate("update the report card", setAssessments, assessments.find((a) => a.id === id), { ratings }, () =>
+        supabase.from("assessments").update({ ratings }).eq("id", id).select("id")
+      ),
+    [assessments, supabase, saveUpdate]
   );
 
   const addEquipment = useCallback(
-    (e: Omit<Equipment, "id">) => {
-      const tempId = nid("eq");
-      setEquipment((prev) => [...prev, { ...e, id: tempId }]);
-      supabase
-        .from("equipment")
-        .insert({
-          item_name: e.itemName,
-          qty: e.qty,
-          school_id: e.schoolId,
-          condition: e.condition,
-          date_issued: e.dateIssued,
-          status: e.status,
-        })
-        .select("*")
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error("Failed to save equipment:", error);
-            setEquipment((prev) => prev.filter((x) => x.id !== tempId));
-            return;
-          }
-          setEquipment((prev) => swapTemp(prev, tempId, mapEquipment(data)));
-        });
-    },
-    [supabase]
+    (e: Omit<Equipment, "id">) =>
+      saveInsert(
+        "add the equipment",
+        setEquipment,
+        { ...e, id: nid("eq") },
+        () =>
+          supabase
+            .from("equipment")
+            .insert({
+              item_name: e.itemName,
+              qty: e.qty,
+              school_id: e.schoolId,
+              condition: e.condition,
+              date_issued: e.dateIssued,
+              status: e.status,
+            })
+            .select("*")
+            .single(),
+        mapEquipment
+      ),
+    [supabase, saveInsert]
   );
 
   const updateEquipmentStatus = useCallback(
-    (
-      id: string,
-      condition: Equipment["condition"],
-      status: Equipment["status"]
-    ) => {
-      setEquipment((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, condition, status } : e))
-      );
-      supabase
-        .from("equipment")
-        .update({ condition, status })
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update equipment:", error);
-        });
-    },
-    [supabase]
+    (id: string, condition: Equipment["condition"], status: Equipment["status"]) =>
+      saveUpdate("update the equipment", setEquipment, equipment.find((e) => e.id === id), { condition, status }, () =>
+        supabase.from("equipment").update({ condition, status }).eq("id", id).select("id")
+      ),
+    [equipment, supabase, saveUpdate]
   );
 
   const addCoach = useCallback(
-    (c: Omit<Coach, "id">) => {
-      const tempId = nid("co");
-      setCoaches((prev) => [...prev, { ...c, id: tempId }]);
-      supabase
-        .from("coaches")
-        .insert({
-          name: c.name,
-          phone: c.phone,
-          assigned_school_id: c.assignedSchoolId,
-          status: c.status,
-          rating: c.rating,
-        })
-        .select("*")
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error("Failed to save coach:", error);
-            setCoaches((prev) => prev.filter((x) => x.id !== tempId));
-            return;
-          }
-          setCoaches((prev) => swapTemp(prev, tempId, mapCoach(data)));
-        });
-    },
-    [supabase]
+    (c: Omit<Coach, "id">) =>
+      saveInsert(
+        "add the coach",
+        setCoaches,
+        { ...c, id: nid("co") },
+        () =>
+          supabase
+            .from("coaches")
+            .insert({
+              name: c.name,
+              phone: c.phone,
+              assigned_school_id: c.assignedSchoolId,
+              status: c.status,
+              rating: c.rating,
+            })
+            .select("*")
+            .single(),
+        mapCoach
+      ),
+    [supabase, saveInsert]
   );
 
   const setCoachRating = useCallback(
-    (id: string, rating: number) => {
-      setCoaches((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, rating } : c))
-      );
-      supabase
-        .from("coaches")
-        .update({ rating })
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update coach rating:", error);
-        });
-    },
-    [supabase]
+    (id: string, rating: number) =>
+      saveUpdate("save the rating", setCoaches, coaches.find((c) => c.id === id), { rating }, () =>
+        supabase.from("coaches").update({ rating }).eq("id", id).select("id")
+      ),
+    [coaches, supabase, saveUpdate]
   );
 
   const addSlot = useCallback(
@@ -715,31 +762,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .select("*")
         .single();
       if (error) {
-        toast(error.code === "23505" ? "That class already has a slot at that time." : "Couldn't save the slot. Try again.");
+        if (error.code === "23505") toast("That class already has a slot at that time.");
+        else saveFailed("save the slot", error);
         return false;
       }
       setSchedule((prev) => upsertById(prev, mapClassSlot(data)));
       return true;
     },
-    [supabase, toast]
+    [supabase, toast, saveFailed]
   );
 
   const removeSlot = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const removed = schedule.find((slot) => slot.id === id);
+      if (!removed) return;
       setSchedule((prev) => prev.filter((slot) => slot.id !== id));
-      supabase
-        .from("class_schedule")
-        .delete()
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error && removed) {
-            setSchedule((prev) => upsertById(prev, removed));
-            toast("Couldn't remove the slot. Try again.");
-          }
-        });
+      const { data, error } = await supabase.from("class_schedule").delete().eq("id", id).select("id");
+      if (!error && data.length) return;
+      setSchedule((prev) => upsertById(prev, removed));
+      saveFailed("remove the slot", error);
     },
-    [schedule, supabase, toast]
+    [schedule, supabase, saveFailed]
   );
 
   // A Pending session for every timetable slot between two dates. Sessions that
@@ -770,7 +813,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           .upsert(rows.slice(i, i + 500), { onConflict: "class_id,date,start_time", ignoreDuplicates: true })
           .select("*");
         if (error) {
-          toast("Couldn't create the sessions. Try again.");
+          // Earlier batches may have saved; running it again skips those.
+          saveFailed("create all the sessions", error);
           return null;
         }
         created += data.length;
@@ -778,7 +822,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
       return { created, skipped: rows.length - created };
     },
-    [schedule, classes, curriculum, supabase, toast]
+    [schedule, classes, curriculum, supabase, saveFailed]
   );
 
   const addSession = useCallback(
@@ -798,13 +842,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .select("*")
         .single();
       if (error) {
-        toast(error.code === "23505" ? "That class already has a session at that date and time." : "Couldn't add the session. Try again.");
+        if (error.code === "23505") toast("That class already has a session at that date and time.");
+        else saveFailed("add the session", error);
         return false;
       }
       setSessions((prev) => upsertById(prev, mapSession(data)));
       return true;
     },
-    [classes, curriculum, supabase, toast]
+    [classes, curriculum, supabase, toast, saveFailed]
   );
 
   const value = useMemo<StoreShape>(
@@ -832,7 +877,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       attendance,
       curriculum,
       fitnessAssessments,
-      loading,
+      status,
       live,
       toggleAttendance,
       setSessionStatus,
@@ -877,7 +922,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       attendance,
       curriculum,
       fitnessAssessments,
-      loading,
+      status,
       live,
       toggleAttendance,
       setSessionStatus,

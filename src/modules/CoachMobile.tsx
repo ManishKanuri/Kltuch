@@ -33,6 +33,7 @@ export default function CoachMobile() {
   );
 
   const [cancelFor, setCancelFor] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState(CANCEL_REASONS[0]);
   const done = mySessions.filter((s) => s.status === "Done").length;
   const firstName = coachName(currentCoachId).split(" ")[0];
@@ -65,9 +66,10 @@ export default function CoachMobile() {
           <Toggle
             on={present}
             label="Mark me present"
-            onClick={() => {
-              toggleAttendance(currentCoachId);
-              toast(present ? "Attendance cleared" : "Marked present");
+            onClick={async () => {
+              if (await toggleAttendance(currentCoachId)) {
+                toast(present ? "Attendance cleared" : "Marked present");
+              }
             }}
           />
         </div>
@@ -96,9 +98,8 @@ export default function CoachMobile() {
 
                 <div className="mt-3 flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      setSessionStatus(s.id, "Done");
-                      toast(`${cls?.className} marked Done`);
+                    onClick={async () => {
+                      if (await setSessionStatus(s.id, "Done")) toast(`${cls?.className} marked Done`);
                     }}
                     disabled={s.status === "Done"}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-klutch-cta px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-klutch-cta-hover disabled:bg-content/[0.08] disabled:text-faint"
@@ -149,18 +150,22 @@ export default function CoachMobile() {
                     </select>
                     <PrimaryButton
                       icon="check"
-                      onClick={() => {
-                        logCancellation(
+                      disabled={cancelling}
+                      onClick={async () => {
+                        setCancelling(true);
+                        const ok = await logCancellation(
                           s.id,
                           reason === "Coach sick" ? "KLUTCH" : "School",
                           reason,
                           null
                         );
-                        setCancelFor(null);
+                        setCancelling(false);
+                        if (!ok) return;
+                        setCancelFor((open) => (open === s.id ? null : open));
                         toast(`${cls?.className} logged as cancelled`);
                       }}
                     >
-                      Log cancellation
+                      {cancelling ? "Saving…" : "Log cancellation"}
                     </PrimaryButton>
                   </div>
                 )}

@@ -40,9 +40,12 @@ export default function EquipmentLog() {
 
   const needsReplace = equipment.filter((e) => e.status === "Replace").length;
 
-  function submit() {
-    if (!item.trim()) return;
-    addEquipment({
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!item.trim() || saving) return;
+    setSaving(true);
+    const ok = await addEquipment({
       itemName: item.trim(),
       qty,
       schoolId,
@@ -50,18 +53,20 @@ export default function EquipmentLog() {
       dateIssued: todayISO(),
       status: "Active",
     });
+    setSaving(false);
+    // On failure the form stays open with what was typed.
+    if (!ok) return;
     toast(`${item.trim()} added to inventory`);
     setItem("");
     setQty(1);
     setOpen(false);
   }
 
-  function cycleCondition(id: string, current: EquipmentCondition) {
+  async function cycleCondition(id: string, current: EquipmentCondition) {
     const next: EquipmentCondition =
       current === "Good" ? "Fair" : current === "Fair" ? "Damaged" : "Good";
     const status: EquipmentStatus = next === "Damaged" ? "Replace" : "Active";
-    updateEquipmentStatus(id, next, status);
-    toast(`Condition set to ${next}`);
+    if (await updateEquipmentStatus(id, next, status)) toast(`Condition set to ${next}`);
   }
 
   return (
@@ -131,8 +136,8 @@ export default function EquipmentLog() {
                 </option>
               ))}
             </select>
-            <PrimaryButton icon="check" onClick={submit}>
-              Save item
+            <PrimaryButton icon="check" onClick={submit} disabled={saving}>
+              {saving ? "Saving…" : "Save item"}
             </PrimaryButton>
           </div>
         </Card>
