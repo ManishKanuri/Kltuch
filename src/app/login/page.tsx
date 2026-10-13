@@ -19,6 +19,20 @@ export default function LoginPage() {
 
   useEffect(() => {
     const supabase = createClient();
+
+    // Recovery/invite links put tokens in the URL hash fragment
+    // (#access_token=...&type=recovery), which the browser never sends to a
+    // server — only client JS can read it. The Supabase client is supposed
+    // to detect and consume this automatically on load (detectSessionInUrl),
+    // firing a PASSWORD_RECOVERY auth event — but if this listener subscribes
+    // even slightly after that detection already ran, the event is missed
+    // entirely with no second chance. Checking the hash directly here is a
+    // synchronous, reliable fallback that doesn't depend on listener timing.
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("type=invite")) {
+      setMode("set-password");
+    }
+
     const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setMode("set-password");
     });
