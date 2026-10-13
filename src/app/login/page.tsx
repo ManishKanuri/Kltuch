@@ -24,16 +24,16 @@ export default function LoginPage() {
     const supabase = createClient();
 
     // Recovery/invite links put tokens (or an error) in the URL hash fragment
-    // (#access_token=...&type=recovery, or #error=...&error_code=otp_expired),
-    // which the browser never sends to a server — only client JS can read it.
-    // The Supabase client is supposed to detect and consume a valid token
-    // automatically on load (detectSessionInUrl), firing a PASSWORD_RECOVERY
-    // auth event — but if this listener subscribes even slightly after that
-    // detection already ran, the event is missed entirely with no second
-    // chance. Checking the hash directly here is a synchronous, reliable
-    // fallback that doesn't depend on listener timing, and lets us surface a
-    // real message for an expired/already-used link instead of silently
-    // falling through to a sign-in form with no password set yet.
+    // (#access_token=...&refresh_token=...&type=recovery, or
+    // #error=...&error_code=otp_expired), which the browser never sends to a
+    // server — only client JS can read it. The Supabase client *can* detect
+    // and consume this automatically (detectSessionInUrl), but that depends
+    // on exact timing relative to this component mounting and is not
+    // reliable enough to build a password-setup flow on. Instead, parse the
+    // hash ourselves and call setSession() explicitly — this is what
+    // actually establishes the session updateUser() below needs; merely
+    // switching the displayed form (the old, broken approach) left no real
+    // session behind it, so submitting failed with "Auth session missing!".
     const hash = window.location.hash;
     if (hash.includes("error=")) {
       const params = new URLSearchParams(hash.slice(1));
@@ -43,8 +43,19 @@ export default function LoginPage() {
           ? "That link has expired or was already used. Ask an admin to send you a new one."
           : params.get("error_description")?.replace(/\+/g, " ") ?? "That link is no longer valid."
       );
-    } else if (hash.includes("type=recovery") || hash.includes("type=invite")) {
-      setMode("set-password");
+    } else if (hash.includes("access_token=") && hash.includes("type=recovery")) {
+      const params = new URLSearchParams(hash.slice(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+          if (error) {
+            setLinkError("That link is no longer valid. Ask an admin to send you a new one.");
+          } else {
+            setMode("set-password");
+          }
+        });
+      }
     }
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
