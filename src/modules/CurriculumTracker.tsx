@@ -8,10 +8,10 @@ export default function CurriculumTracker() {
 
   return (
     <div className="space-y-4">
-      <SectionTitle icon="curriculum">Curriculum Tracker</SectionTitle>
+      <SectionTitle icon="curriculum">Curriculum tracker</SectionTitle>
       <p className="-mt-2 text-sm text-muted">
-        Which curriculum week each class has reached — so coaches resume from the
-        right place. Weeks tick up as sessions are marked Done.
+        The curriculum week each class has reached, so coaches pick up in the
+        right place. Weeks advance as sessions are marked Done.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -41,18 +41,18 @@ export default function CurriculumTracker() {
                   )}
                 </div>
                 <div className="text-right">
-                  <div className="font-display text-2xl font-extrabold text-content">
+                  <div className="font-display text-[1.75rem] font-black leading-none tracking-[-0.03em] text-content">
                     Wk {liveWeek}
                   </div>
-                  <div className="text-xs text-faint">of {cw.totalWeeks}</div>
+                  <div className="mt-1 font-mono text-[11px] text-faint">of {cw.totalWeeks}</div>
                 </div>
               </div>
               <div className="mt-3">
-                <Meter value={pctVal} tone="gradient" />
+                <Meter value={pctVal} tone="blue" />
               </div>
-              <div className="mt-1.5 flex justify-between text-[11px] text-faint">
+              <div className="mt-2 flex justify-between font-mono text-[11px] text-faint">
                 <span>{pctVal}% delivered</span>
-                <span>Last: {cw.lastDelivered}</span>
+                <span>Last {cw.lastDelivered}</span>
               </div>
             </Card>
           );

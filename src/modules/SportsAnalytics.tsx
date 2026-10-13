@@ -23,6 +23,7 @@ import {
   SectionTitle,
   StarRating,
   StatCard,
+  StatGrid,
   Table,
   Td,
   Th,
@@ -34,9 +35,9 @@ const SKILLS: SkillKey[] = ["motorSkills", "coordination", "fitness", "attitude"
 
 // Sessions-by-status uses reserved status colors (never a categorical series).
 const STATUS_META = [
-  { key: "Done", color: "#10b981" },
-  { key: "Pending", color: "#f59e0b" },
-  { key: "Cancelled", color: "#f43f5e" },
+  { key: "Done", color: "rgb(var(--hue-lime))" },
+  { key: "Pending", color: "rgb(var(--hue-amber))" },
+  { key: "Cancelled", color: "rgb(var(--hue-orange))" },
 ] as const;
 
 export default function SportsAnalytics() {
@@ -68,55 +69,52 @@ export default function SportsAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatGrid cols={4}>
         <StatCard
-          label="Session Completion"
+          label="Session completion"
           icon="target"
           tone="blue"
           value={`${comp.rate}%`}
           sub={`${comp.done}/${comp.total} delivered`}
         />
         <StatCard
-          label="Coach Attendance"
+          label="Coach attendance"
           icon="attendance"
           tone="tennis"
           value={`${att.rate}%`}
           sub={`${att.present}/${att.total} present today`}
         />
         <StatCard
-          label="Avg Skill Rating"
+          label="Average skill rating"
           icon="star"
           tone="orange"
           value={`${teamAvg}`}
           sub="Across all assessed skills"
         />
         <StatCard
-          label="Active Classes"
+          label="Active classes"
           icon="curriculum"
           tone="neutral"
           value={classes.length}
           sub={`${coaches.length} coaches`}
         />
-      </div>
+      </StatGrid>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Completion by sport (categorical + icon + label + value) */}
         <div>
-          <SectionTitle icon="trophy">Completion by Sport</SectionTitle>
+          <SectionTitle icon="trophy">Completion by sport</SectionTitle>
           <Card className="space-y-4 p-5">
             {sports.map((sp) => (
               <div key={sp.sport}>
                 <div className="mb-1.5 flex items-center justify-between text-sm">
-                  <span
-                    className="inline-flex items-center gap-2 font-semibold"
-                    style={{ color: SPORT_COLOR[sp.sport] }}
-                  >
-                    <Icon name={SPORT_ICON[sp.sport]} size={16} />
+                  <span className="inline-flex items-center gap-2 font-semibold text-content">
+                    <Icon name={SPORT_ICON[sp.sport]} size={16} style={{ color: SPORT_COLOR[sp.sport] }} />
                     {sp.sport}
                   </span>
-                  <span className="font-semibold text-content">
+                  <span className="font-mono font-bold text-content">
                     {sp.rate}%{" "}
-                    <span className="text-xs font-normal text-faint">
+                    <span className="text-xs font-medium text-faint">
                       ({sp.done}/{sp.sessions})
                     </span>
                   </span>
@@ -137,7 +135,7 @@ export default function SportsAnalytics() {
 
         {/* Skill averages (sequential single hue = magnitude) */}
         <div>
-          <SectionTitle icon="analytics">Team Skill Averages</SectionTitle>
+          <SectionTitle icon="analytics">Team skill averages</SectionTitle>
           <Card className="space-y-4 p-5">
             {SKILLS.map((sk) => (
               <div key={sk}>
@@ -145,8 +143,8 @@ export default function SportsAnalytics() {
                   <span className="font-medium text-content">
                     {SKILL_LABELS[sk]}
                   </span>
-                  <span className="font-semibold text-klutch-blue-bright">
-                    {skills[sk]} / 5
+                  <span className="font-mono font-bold text-accent">
+                    {skills[sk]}/5
                   </span>
                 </div>
                 <Meter value={(skills[sk] / 5) * 100} tone="blue" />
@@ -158,9 +156,9 @@ export default function SportsAnalytics() {
 
       {/* Sessions by status */}
       <div>
-        <SectionTitle icon="session">Sessions by Status</SectionTitle>
+        <SectionTitle icon="session">Sessions by status</SectionTitle>
         <Card className="p-5">
-          <div className="flex h-4 w-full gap-0.5 overflow-hidden rounded-full">
+          <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full">
             {statusCounts.map((s) =>
               s.n > 0 ? (
                 <div
@@ -179,11 +177,11 @@ export default function SportsAnalytics() {
             {statusCounts.map((s) => (
               <span key={s.key} className="flex items-center gap-2 text-sm">
                 <span
-                  className="h-3 w-3 rounded-sm"
+                  className="h-[9px] w-[9px] rounded-[1px]"
                   style={{ backgroundColor: s.color }}
                 />
                 <span className="text-muted">{s.key}</span>
-                <span className="font-semibold text-content">{s.n}</span>
+                <span className="font-mono font-bold text-content">{s.n}</span>
               </span>
             ))}
           </div>
@@ -192,13 +190,13 @@ export default function SportsAnalytics() {
 
       {/* Coach leaderboard */}
       <div>
-        <SectionTitle icon="trophy">Coach Leaderboard</SectionTitle>
+        <SectionTitle icon="trophy">Coach leaderboard</SectionTitle>
         <Card className="overflow-hidden">
           <Table>
             <THead>
               <Th>Rank</Th>
               <Th>Coach</Th>
-              <Th>Sessions Done</Th>
+              <Th>Sessions done</Th>
               <Th>Completion</Th>
               <Th>Rating</Th>
             </THead>
@@ -207,25 +205,25 @@ export default function SportsAnalytics() {
                 <Tr key={c.coachId} i={i}>
                   <Td>
                     <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-sm font-mono text-xs font-bold ${
                         i === 0
-                          ? "bg-klutch-orange/15 text-klutch-orange"
-                          : "bg-content/8 text-muted"
+                          ? "bg-hue-lime text-klutch-ink"
+                          : "bg-content/[0.07] text-muted"
                       }`}
                     >
                       {i + 1}
                     </span>
                   </Td>
                   <Td className="font-semibold text-content">{c.name}</Td>
-                  <Td>
+                  <Td className="font-mono">
                     {c.done}/{c.total}
                   </Td>
                   <Td>
                     <div className="flex items-center gap-2">
                       <div className="w-24">
-                        <Meter value={c.rate} tone="gradient" />
+                        <Meter value={c.rate} tone="blue" />
                       </div>
-                      <span className="text-xs font-medium text-muted">
+                      <span className="font-mono text-xs font-medium text-muted">
                         {c.rate}%
                       </span>
                     </div>

@@ -56,11 +56,11 @@ export default function CoachManagement() {
         icon="coaches"
         right={
           <PrimaryButton icon="plus" onClick={() => setOpen((v) => !v)}>
-            Add Coach
+            Add coach
           </PrimaryButton>
         }
       >
-        Coach Management
+        Coaches
       </SectionTitle>
 
       {open && (
@@ -70,17 +70,20 @@ export default function CoachManagement() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Coach name"
+              aria-label="Coach name"
               className="k-field"
             />
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Phone"
+              aria-label="Phone"
               className="k-field"
             />
             <select
               value={schoolId}
               onChange={(e) => setSchoolId(e.target.value)}
+              aria-label="Assigned school"
               className="k-field"
             >
               {schools.map((s) => (
@@ -90,7 +93,7 @@ export default function CoachManagement() {
               ))}
             </select>
             <PrimaryButton icon="check" onClick={submit}>
-              Save Coach
+              Save coach
             </PrimaryButton>
           </div>
         </Card>
@@ -101,7 +104,7 @@ export default function CoachManagement() {
           <THead>
             <Th>Coach</Th>
             <Th>Phone</Th>
-            <Th>Assigned School</Th>
+            <Th>Assigned school</Th>
             <Th>Classes</Th>
             <Th>Status</Th>
             <Th>Performance</Th>
@@ -114,7 +117,7 @@ export default function CoachManagement() {
               return (
                 <Tr key={c.id} i={i}>
                   <Td className="font-semibold text-content">{c.name}</Td>
-                  <Td>{c.phone}</Td>
+                  <Td className="font-mono text-[13px]">{c.phone}</Td>
                   <Td>{schoolName(c.assignedSchoolId)}</Td>
                   <Td>{classCount}</Td>
                   <Td>

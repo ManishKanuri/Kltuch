@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LogoMark } from "@/components/Logo";
-import { Icon } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -94,87 +93,115 @@ export default function LoginPage() {
     router.refresh();
   }
 
+  const buttonClass =
+    "flex w-full items-center justify-center rounded-sm bg-klutch-cta px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-klutch-cta-hover disabled:bg-content/[0.08] disabled:text-faint";
+  const labelClass = "mb-1.5 block text-[13px] font-semibold text-content";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-klutch-ink bg-sidebar-glow p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
-        <div className="mb-6 flex flex-col items-center gap-3">
-          <LogoMark size={44} />
-          <div className="text-center">
-            <div className="font-display text-xl font-bold text-white">KLUTCH SportsEd</div>
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Internal ERP</div>
-          </div>
+    <div className="flex min-h-screen flex-col bg-bg md:flex-row">
+      {/* The brand's field: royal blue + court markings, the site's hero device */}
+      <section className="relative flex shrink-0 flex-col justify-between gap-10 overflow-hidden bg-klutch-field px-6 pb-8 pt-6 text-white md:w-[52%] md:px-12 md:py-10">
+        <div
+          aria-hidden
+          className="court-lines pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[840px] -translate-x-1/2 -translate-y-1/2 opacity-[0.16]"
+          style={{ backgroundSize: "100% 100%" }}
+        />
+        <div className="relative flex items-center gap-3">
+          <LogoMark size={36} />
+          <span className="font-display text-[19px] leading-none tracking-[-0.02em]">
+            <span className="font-black">KLUTCH</span>{" "}
+            <span className="font-semibold opacity-70">SportsEd</span>
+          </span>
         </div>
+        <div className="relative">
+          <h1 className="font-display text-[clamp(2.5rem,5.1vw,5.25rem)] font-black uppercase leading-[0.88] tracking-[-0.042em]">
+            Sport is a<br />subject now.
+          </h1>
+          <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70 md:mt-6 md:text-[12px]">
+            Internal ERP for coaches, schools and founders
+          </p>
+        </div>
+      </section>
 
-        {linkError && (
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
-            {linkError}
-          </div>
-        )}
+      <section className="flex flex-1 justify-center px-6 py-10 md:items-center md:py-12">
+        <div className="w-full max-w-sm">
+          <h2 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-[-0.025em] text-content">
+            {mode === "signin" ? "Sign in" : "Set your password"}
+          </h2>
+          <p className="mt-1.5 text-[15px] text-muted">
+            {mode === "signin"
+              ? "Use the email your KLUTCH admin invited."
+              : "Choose a password to finish setting up your account."}
+          </p>
 
-        {mode === "signin" ? (
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-klutch-blue-bright"
-                placeholder="you@klutchsportsed.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-klutch-blue-bright"
-                placeholder="••••••••"
-              />
-            </div>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-brand disabled:opacity-60"
+          {linkError && (
+            <div
+              role="alert"
+              className="mt-6 rounded-sm border border-warn/30 bg-warn/10 px-3 py-2.5 text-[13px] text-content"
             >
-              <Icon name="check" size={15} />
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-            <p className="text-center text-[11px] text-slate-500">
-              First time here from an invite link? It'll drop you into password setup automatically.
-            </p>
-          </form>
-        ) : (
-          <form onSubmit={handleSetPassword} className="space-y-4">
-            <p className="text-sm text-slate-300">Set a password to finish setting up your account.</p>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">New password</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-klutch-blue-bright"
-                placeholder="At least 8 characters"
-              />
+              {linkError}
             </div>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-brand disabled:opacity-60"
-            >
-              <Icon name="check" size={15} />
-              {loading ? "Saving…" : "Set password & continue"}
-            </button>
-          </form>
-        )}
-      </div>
+          )}
+
+          {mode === "signin" ? (
+            <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="email" className={labelClass}>Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="k-field py-2.5"
+                  placeholder="you@klutchsportsedu.com"
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className={labelClass}>Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="k-field py-2.5"
+                />
+              </div>
+              {error && <p role="alert" className="text-[13px] font-medium text-bad">{error}</p>}
+              <button type="submit" disabled={loading} className={buttonClass}>
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+              <p className="text-[13px] text-faint">
+                Opening an invite link takes you straight to password setup.
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={handleSetPassword} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="new-password" className={labelClass}>New password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="k-field py-2.5"
+                  placeholder="At least 8 characters"
+                />
+              </div>
+              {error && <p role="alert" className="text-[13px] font-medium text-bad">{error}</p>}
+              <button type="submit" disabled={loading} className={buttonClass}>
+                {loading ? "Saving…" : "Set password and continue"}
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

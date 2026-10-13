@@ -8,6 +8,7 @@ import {
   PrimaryButton,
   SectionTitle,
   StatCard,
+  StatGrid,
   StatusTag,
   Table,
   Td,
@@ -59,7 +60,7 @@ export default function EquipmentLog() {
       current === "Good" ? "Fair" : current === "Fair" ? "Damaged" : "Good";
     const status: EquipmentStatus = next === "Damaged" ? "Replace" : "Active";
     updateEquipmentStatus(id, next, status);
-    toast(`Condition → ${next}`);
+    toast(`Condition set to ${next}`);
   }
 
   return (
@@ -68,36 +69,36 @@ export default function EquipmentLog() {
         icon="equipment"
         right={
           <PrimaryButton icon="plus" onClick={() => setOpen((v) => !v)}>
-            Add Equipment
+            Add equipment
           </PrimaryButton>
         }
       >
-        Equipment Log
+        Equipment
       </SectionTitle>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <StatGrid cols={3}>
         <StatCard
-          label="Total Items"
+          label="Total items"
           icon="equipment"
           tone="blue"
           value={equipment.reduce((s, e) => s + e.qty, 0)}
           sub={`${equipment.length} line items`}
         />
         <StatCard
-          label="Needs Replace"
+          label="Needs replacing"
           icon="cancel"
           tone="orange"
           value={needsReplace}
           sub="Damaged items"
         />
         <StatCard
-          label="Schools Covered"
+          label="Schools covered"
           icon="school"
           tone="neutral"
           value={new Set(equipment.map((e) => e.schoolId)).size}
-          sub="With equipment"
+          sub="With equipment issued"
         />
-      </div>
+      </StatGrid>
 
       {open && (
         <Card className="animate-fade-up p-4">
@@ -106,6 +107,7 @@ export default function EquipmentLog() {
               value={item}
               onChange={(e) => setItem(e.target.value)}
               placeholder="Item name"
+              aria-label="Item name"
               className="k-field"
             />
             <input
@@ -113,11 +115,13 @@ export default function EquipmentLog() {
               min={1}
               value={qty}
               onChange={(e) => setQty(Number(e.target.value))}
+              aria-label="Quantity"
               className="k-field"
             />
             <select
               value={schoolId}
               onChange={(e) => setSchoolId(e.target.value)}
+              aria-label="School"
               className="k-field"
             >
               {schools.map((s) => (
@@ -127,7 +131,7 @@ export default function EquipmentLog() {
               ))}
             </select>
             <PrimaryButton icon="check" onClick={submit}>
-              Save Item
+              Save item
             </PrimaryButton>
           </div>
         </Card>
@@ -139,7 +143,7 @@ export default function EquipmentLog() {
             <Th>Item</Th>
             <Th>Qty</Th>
             <Th>School</Th>
-            <Th>Date Issued</Th>
+            <Th>Date issued</Th>
             <Th>Condition</Th>
             <Th>Status</Th>
           </THead>
@@ -147,13 +151,14 @@ export default function EquipmentLog() {
             {equipment.map((e, i) => (
               <Tr key={e.id} i={i}>
                 <Td className="font-semibold text-content">{e.itemName}</Td>
-                <Td>{e.qty}</Td>
+                <Td className="font-mono">{e.qty}</Td>
                 <Td>{schoolName(e.schoolId)}</Td>
-                <Td>{e.dateIssued}</Td>
+                <Td className="font-mono text-[13px]">{e.dateIssued}</Td>
                 <Td>
                   <button
                     onClick={() => cycleCondition(e.id, e.condition)}
-                    title="Click to cycle condition"
+                    aria-label={`Change condition, currently ${e.condition}`}
+                    className="rounded-sm border border-line px-2 py-1 transition-colors hover:border-accent"
                   >
                     <StatusTag value={e.condition} />
                   </button>
@@ -166,8 +171,8 @@ export default function EquipmentLog() {
           </tbody>
         </Table>
         <div className="border-t border-line px-4 py-3 text-xs text-faint">
-          Tip: click a condition tag to cycle Good → Fair → Damaged. Damaged
-          items auto-flag as “Replace”.
+          Click a condition to step it from Good to Fair to Damaged. Damaged
+          items are flagged for replacement.
         </div>
       </Card>
     </div>

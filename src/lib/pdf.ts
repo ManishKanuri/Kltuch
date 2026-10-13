@@ -10,14 +10,24 @@
 //     so the live modal is untouched) for a crisp, print-friendly result. The
 //     always-dark header keeps the branded look.
 
+// Must stay in sync with :root in globals.css — every theme-aware variable,
+// or dark-mode values leak into the light export.
 const LIGHT_TOKENS: Record<string, string> = {
-  "--bg": "240 242 246",
+  "--bg": "242 243 246",
   "--surface": "255 255 255",
-  "--elevated": "248 250 252",
-  "--content": "12 15 22",
-  "--muted": "92 104 120",
-  "--faint": "148 160 176",
-  "--line": "224 228 236",
+  "--elevated": "246 247 250",
+  "--content": "11 18 40",
+  "--muted": "78 90 120",
+  "--faint": "99 110 137",
+  "--line": "201 207 221",
+  "--accent": "18 58 214",
+  "--good": "78 110 0",
+  "--warn": "154 103 0",
+  "--bad": "181 48 13",
+  "--hue-blue": "18 58 214",
+  "--hue-orange": "204 58 17",
+  "--hue-lime": "159 197 22",
+  "--hue-amber": "224 161 0",
 };
 
 export async function downloadElementPdf(el: HTMLElement, filename: string) {
@@ -42,7 +52,13 @@ export async function downloadElementPdf(el: HTMLElement, filename: string) {
       useCORS: true,
       backgroundColor: "#ffffff",
       windowWidth: el.scrollWidth,
-      onclone: (_doc, clone) => {
+      onclone: (doc, clone) => {
+        // The clone is a fresh document, so CSS animations restart from frame 0 —
+        // grow-in bars would be captured at scaleX(0). Freeze everything at its
+        // final state instead.
+        const freeze = doc.createElement("style");
+        freeze.textContent = "*,*::before,*::after{animation:none!important;transition:none!important}";
+        doc.head.appendChild(freeze);
         // `clone` is the captured copy — editing it leaves the on-screen modal alone.
         const s = (clone as HTMLElement).style;
         for (const [key, value] of Object.entries(LIGHT_TOKENS)) s.setProperty(key, value);

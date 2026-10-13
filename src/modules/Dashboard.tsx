@@ -13,6 +13,7 @@ import {
   OutlineButton,
   SectionTitle,
   StatCard,
+  StatGrid,
   StatusTag,
   Table,
   Td,
@@ -99,105 +100,90 @@ export default function Dashboard() {
           action:
             s.status === "Cancelled"
               ? "Session cancelled"
-              : `${cls?.className ?? ""} · Curriculum Wk ${s.curriculumWeek}`,
+              : `${cls?.className ?? ""}, curriculum week ${s.curriculumWeek}`,
           status: s.status,
         };
       });
   }, [sessions, classById, coachName, schoolName]);
 
   return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-7">
+      <StatGrid cols={4}>
         <StatCard
-          label="Sessions Today"
+          label="Sessions today"
           icon="session"
           tone="blue"
           value={
             <>
               {stats.doneToday}
-              <span className="text-lg text-faint"> / {stats.totalToday}</span>
+              <span className="text-xl text-faint">/{stats.totalToday}</span>
             </>
           }
           sub={`${stats.pendingToday} still pending`}
         />
         <StatCard
-          label="Coaches Present"
+          label="Coaches present"
           icon="attendance"
           tone="tennis"
           value={
             <>
               {stats.presentToday}
-              <span className="text-lg text-faint"> / {stats.totalCoaches}</span>
+              <span className="text-xl text-faint">/{stats.totalCoaches}</span>
             </>
           }
           sub={`${stats.absentToday} absent today`}
         />
         <StatCard
-          label="Fitness Baselines"
+          label="Fitness baselines"
           icon="assessment"
           tone="orange"
-          value={stats.fitnessAssessed}
-          sub={`${stats.pendingAssessments} classes pending skills`}
+          value={stats.fitnessAssessed.toLocaleString()}
+          sub={`${stats.pendingAssessments} classes still need skill ratings`}
         />
         <StatCard
-          label="Cancellations MTD"
+          label="Cancellations this month"
           icon="cancel"
           tone="neutral"
           value={stats.cancelMTD}
           sub="June 2025"
         />
-      </div>
+      </StatGrid>
 
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap gap-2">
         <OutlineButton icon="attendance" onClick={() => setActive("coach-attendance")}>
-          Mark Attendance
+          Mark attendance
         </OutlineButton>
         <OutlineButton icon="session" onClick={() => setActive("session-tracker")}>
-          Log Session
+          Log session
         </OutlineButton>
         <OutlineButton icon="cancel" onClick={() => setActive("cancellation-log")}>
-          Log Cancellation
+          Log cancellation
         </OutlineButton>
         <OutlineButton icon="assessment" onClick={() => setActive("student-assessment")}>
-          Add Assessment
-        </OutlineButton>
-        <OutlineButton icon="analytics" onClick={() => setActive("sports-analytics")}>
-          Sports Analytics
-        </OutlineButton>
-        <OutlineButton icon="assessment" onClick={() => setActive("fitness-analytics")}>
-          Fitness Analytics
+          Add assessment
         </OutlineButton>
       </div>
 
-      {/* Sports at a glance */}
       <div>
-        <SectionTitle icon="attendance">Fitness Engagement</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <StatCard label="Student Attendance" icon="attendance" tone="tennis" value={`${fitnessEngagement.attendanceRate}%`} sub="Across recorded fitness sessions" />
-          <StatCard label="Sessions Finished" icon="check-circle" tone="blue" value={fitnessEngagement.finished.toLocaleString()} sub="Student session completions" />
-          <StatCard label="Sessions Missed" icon="cancel" tone="orange" value={fitnessEngagement.missed.toLocaleString()} sub="Follow-up opportunities" />
-        </div>
+        <SectionTitle icon="attendance">Fitness engagement</SectionTitle>
+        <StatGrid cols={3}>
+          <StatCard label="Student attendance" icon="attendance" tone="tennis" value={`${fitnessEngagement.attendanceRate}%`} sub="Across recorded fitness sessions" />
+          <StatCard label="Sessions finished" icon="check-circle" tone="blue" value={fitnessEngagement.finished.toLocaleString()} sub="Student session completions" />
+          <StatCard label="Sessions missed" icon="cancel" tone="orange" value={fitnessEngagement.missed.toLocaleString()} sub="Worth a follow-up with the school" />
+        </StatGrid>
       </div>
 
-      {/* Sports at a glance */}
       <div>
-        <SectionTitle icon="trophy">Sports at a Glance</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <SectionTitle icon="trophy">Sports at a glance</SectionTitle>
+        <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
           {sports.map((sp) => (
-            <Card key={sp.sport} className="p-4">
+            <div key={sp.sport} className="bg-surface p-5">
               <div className="flex items-center justify-between">
-                <span
-                  className="inline-flex items-center gap-2 font-display font-bold"
-                  style={{ color: SPORT_COLOR[sp.sport] }}
-                >
-                  <Icon name={SPORT_ICON[sp.sport]} size={20} />
+                <span className="inline-flex items-center gap-2 font-display text-[1.0625rem] font-extrabold tracking-[-0.015em] text-content">
+                  <Icon name={SPORT_ICON[sp.sport]} size={19} style={{ color: SPORT_COLOR[sp.sport] }} />
                   {sp.sport}
                 </span>
-                <span className="text-sm font-semibold text-content">
-                  {sp.rate}%
-                </span>
+                <span className="font-mono text-sm font-bold text-content">{sp.rate}%</span>
               </div>
               <div className="mt-3">
                 <Meter
@@ -211,30 +197,19 @@ export default function Dashboard() {
                   }
                 />
               </div>
-              <div className="mt-2 flex justify-between text-xs text-muted">
+              <div className="mt-2.5 flex justify-between text-[12.5px] text-muted">
                 <span>{sp.classes} classes</span>
-                <span>
+                <span className="font-mono">
                   {sp.done}/{sp.sessions} sessions done
                 </span>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Recent activity */}
       <div>
-        <SectionTitle
-          icon="clock"
-          right={
-            <span className="flex items-center gap-1.5 text-xs text-muted">
-              <span className="h-2 w-2 animate-pulse-dot rounded-full bg-klutch-tennis" />
-              Live
-            </span>
-          }
-        >
-          Recent Activity
-        </SectionTitle>
+        <SectionTitle icon="clock">Today’s sessions</SectionTitle>
         <Card className="overflow-hidden">
           <Table>
             <THead>
@@ -247,7 +222,7 @@ export default function Dashboard() {
             <tbody>
               {activity.map((r, i) => (
                 <Tr key={r.key} i={i}>
-                  <Td className="font-medium text-faint">{r.time}</Td>
+                  <Td className="font-mono text-[13px] text-faint">{r.time}</Td>
                   <Td className="font-semibold text-content">{r.coach}</Td>
                   <Td>{r.school}</Td>
                   <Td>{r.action}</Td>
@@ -256,12 +231,11 @@ export default function Dashboard() {
                   </Td>
                 </Tr>
               ))}
-              {activity.length === 0 && <Empty cols={5}>No activity today.</Empty>}
+              {activity.length === 0 && <Empty cols={5}>No sessions scheduled today.</Empty>}
             </tbody>
           </Table>
-          <div className="border-t border-line px-4 py-3 text-xs text-faint">
-            Coaches mark attendance and sessions from their mobile screen — the
-            admin sees live updates here.
+          <div className="border-t border-line px-4 py-3 text-[12.5px] text-faint">
+            Coaches log attendance and sessions from their phones. Refresh to pull in the latest.
           </div>
         </Card>
       </div>

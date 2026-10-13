@@ -2,22 +2,19 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import { analyzeFitnessStudent, fitnessStatusWord, FITNESS_METRICS } from "@/lib/stats";
+import { analyzeFitnessStudent, fitnessStatusWord } from "@/lib/stats";
 import type { FitnessAssessment } from "@/lib/types";
 import { Icon } from "./icons";
 import { LogoMark } from "./Logo";
-import { Card, Modal, SectionTitle, Table, Td, Th, THead, Tr } from "./ui";
+import { Card, Modal, PrimaryButton, SectionTitle, Table, Td, Th, THead, Tr } from "./ui";
 import { downloadElementPdf } from "@/lib/pdf";
 
+// Bar fills use the site's on-dark variants; the status word itself stays
+// neutral (as on the site) so meaning never rides on color alone.
 const STATUS_BAR_COLOR: Record<string, string> = {
-  Excelling: "bg-klutch-tennis",
+  Excelling: "bg-klutch-lime-bright",
   "On track": "bg-klutch-blue-bright",
-  Developing: "bg-klutch-orange",
-};
-const STATUS_TEXT_COLOR: Record<string, string> = {
-  Excelling: "text-klutch-tennis",
-  "On track": "text-klutch-blue-bright",
-  Developing: "text-klutch-orange-bright",
+  Developing: "bg-klutch-orange-bright",
 };
 
 export default function FitnessReportCards() {
@@ -34,30 +31,34 @@ export default function FitnessReportCards() {
   return (
     <div className="space-y-4 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <SectionTitle icon="assessment">CISCE Fitness Report Cards</SectionTitle>
+        <SectionTitle icon="assessment">CISCE fitness report cards</SectionTitle>
         <div className="flex flex-wrap gap-2">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or student ID" className="k-field w-52" />
-          <select value={schoolId} onChange={(event) => setSchoolId(event.target.value)} className="k-field w-40">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or student ID" aria-label="Search students" className="k-field w-52" />
+          <select value={schoolId} onChange={(event) => setSchoolId(event.target.value)} aria-label="Filter by school" className="k-field w-40">
             <option value="all">All schools</option>
             {schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
           </select>
         </div>
       </div>
       <p className="text-sm text-muted">
-        {records.length.toLocaleString()} fitness records found. Showing the first {displayed.length}; use search to open any student’s report card.
+        {records.length.toLocaleString()} fitness records found. Showing the first {displayed.length}; search to open any student’s report card.
       </p>
       <Card className="overflow-hidden">
         <Table>
           <THead><Th>Student</Th><Th>School</Th><Th>Class</Th><Th>Gender</Th><Th>Attendance</Th><Th>Sessions</Th><Th>Report</Th></THead>
           <tbody>{displayed.map((record, index) => (
             <Tr key={record.id} i={index}>
-              <Td><div className="font-semibold text-content">{record.studentName}</div><div className="text-xs text-faint">{record.studentId}</div></Td>
+              <Td><div className="font-semibold text-content">{record.studentName}</div><div className="font-mono text-[11px] text-faint">{record.studentId}</div></Td>
               <Td>{schoolName(record.schoolId)}</Td>
               <Td>{record.className}</Td>
               <Td>{record.gender}</Td>
-              <Td>{record.attendanceRate}%</Td>
-              <Td>{record.sessionsFinished}/{record.sessionsScheduled}</Td>
-              <Td><button onClick={() => setReportFor(record)} className="inline-flex items-center gap-1.5 rounded-lg border border-klutch-blue/40 px-2.5 py-1 text-xs font-semibold text-klutch-blue-bright transition hover:bg-klutch-blue/10"><Icon name="download" size={13} /> Report Card</button></Td>
+              <Td className="font-mono">{record.attendanceRate}%</Td>
+              <Td className="font-mono">{record.sessionsFinished}/{record.sessionsScheduled}</Td>
+              <Td>
+                <button onClick={() => setReportFor(record)} className="inline-flex items-center gap-1.5 rounded-sm border border-line px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent hover:bg-accent/[0.06]">
+                  <Icon name="download" size={13} /> Report card
+                </button>
+              </Td>
             </Tr>
           ))}</tbody>
         </Table>
@@ -82,71 +83,152 @@ function FitnessReportCard({ record, onClose }: { record: FitnessAssessment; onC
       await downloadElementPdf(cardRef.current, `fitness-report-card-${safeName}.pdf`);
       toast("Fitness report card PDF downloaded");
     } catch {
-      toast("Could not generate PDF — please try again");
+      toast("Could not generate the PDF. Try again.");
     } finally {
       setSaving(false);
     }
   }
+
   return (
     <Modal ref={cardRef} onClose={onClose} className="max-w-2xl">
-        <div className="relative overflow-hidden bg-klutch-ink bg-sidebar-glow px-6 py-5 text-white">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3"><LogoMark size={40} /><div><div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">CISCE Fitness Report Card</div><div className="font-display text-2xl font-extrabold">{record.studentName}</div><div className="mt-0.5 text-sm text-slate-400">{record.studentId} · {record.className} · {record.gender} · {schoolName(record.schoolId)}</div></div></div>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Close"><Icon name="x" size={18} /></button>
-          </div>
-        </div>
-        <div className="space-y-5 p-6">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Summary label="Profile" value={analysis.profile} sub={`${analysis.aboveAverage}/5 metrics at or better than cohort`} />
-            <Summary label="Cohort" value={`Grade ${record.grade}`} sub={`${cohort.length} students at this school`} />
-            <Summary label="BMI measurement" value={String(record.bmi)} sub="Recorded value — not a diagnosis" />
-            <Summary label="Attendance" value={`${record.attendanceRate}%`} sub={`${record.sessionsFinished}/${record.sessionsScheduled} sessions finished`} />
-          </div>
+      <ReportHeader
+        eyebrow="CISCE fitness report card"
+        name={record.studentName}
+        meta={[record.studentId, record.className, record.gender, schoolName(record.schoolId)]}
+        onClose={onClose}
+      />
 
-          <div className="overflow-hidden rounded-2xl bg-klutch-ink p-5 text-white">
-            <div className="mb-4 font-display text-sm font-bold uppercase tracking-wide text-slate-400">
-              Fitness Breakdown
-            </div>
-            <div className="space-y-4">
-              {analysis.insights.map((item) => {
-                const status = fitnessStatusWord(item.better, item.relative);
-                const fillPct = Math.max(8, Math.min(100, 50 + (item.better ? 1 : -1) * item.relative));
-                return (
-                  <div key={item.key}>
-                    <div className="flex items-baseline justify-between gap-3 text-sm">
-                      <span className="font-medium text-white">{item.label}</span>
-                      <span className="font-display font-bold text-white">
-                        {item.value} <span className="text-xs font-normal text-slate-400">{item.unit}</span>
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className={`h-full origin-left rounded-full ${STATUS_BAR_COLOR[status]} animate-grow-bar`}
-                        style={{ width: `${fillPct}%` }}
-                      />
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-xs">
-                      <span className={`font-semibold uppercase tracking-wide ${STATUS_TEXT_COLOR[status]}`}>
-                        {status}
-                      </span>
-                      <span className="text-slate-500">cohort avg {item.average} {item.unit}</span>
-                    </div>
+      <div className="space-y-5 p-6">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
+          <SummaryCell label="Profile" value={analysis.profile} sub={`${analysis.aboveAverage} of 5 metrics at or above cohort`} />
+          <SummaryCell label="Cohort" value={`Grade ${record.grade}`} sub={`${cohort.length} students at this school`} />
+          <SummaryCell label="BMI measurement" value={String(record.bmi)} sub="Recorded value, not a diagnosis" />
+          <SummaryCell label="Attendance" value={`${record.attendanceRate}%`} sub={`${record.sessionsFinished} of ${record.sessionsScheduled} sessions finished`} />
+        </div>
+
+        <div className="rounded-lg bg-klutch-ink p-6 text-white dark:ring-1 dark:ring-white/[0.07]">
+          <div className="mb-5 font-display text-base font-extrabold tracking-[-0.02em]">Fitness breakdown</div>
+          <div className="space-y-5">
+            {analysis.insights.map((item) => {
+              const status = fitnessStatusWord(item.better, item.relative);
+              const fillPct = Math.max(8, Math.min(100, 50 + (item.better ? 1 : -1) * item.relative));
+              return (
+                <div key={item.key}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[15px] font-semibold">{item.label}</span>
+                    <span className="font-mono text-[15px] font-bold tabular-nums">
+                      {item.value} <span className="text-[12px] font-medium text-white/60">{item.unit}</span>
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.18]">
+                    <div
+                      className={`h-full origin-left rounded-full ${STATUS_BAR_COLOR[status]} animate-grow-bar`}
+                      style={{ width: `${fillPct}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.13em]">
+                    <span className="font-medium text-white/[0.62]">{status}</span>
+                    <span className="normal-case tracking-normal text-white/50">cohort avg {item.average} {item.unit}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InsightBox title="Strengths" tone="emerald" items={analysis.strengths.map((item) => item.label)} empty="Consistent profile across the current measures." />
-            <InsightBox title="Focus for coaching" tone="amber" items={analysis.focus.map((item) => item.label)} empty="Continue maintaining the current all-round routine." />
-          </div>
-          <p className="rounded-xl border border-line bg-elevated p-3 text-xs leading-relaxed text-muted">This report compares fitness performance with students in the same school and grade. It supports sports coaching and is not medical advice. BMI requires age- and sex-specific percentile data before any clinical interpretation.</p>
-          <div data-pdf-hide className="flex justify-end border-t border-line pt-4"><button onClick={downloadPdf} disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3.5 py-2.5 text-sm font-semibold text-white shadow-brand disabled:opacity-60"><Icon name="download" size={15} /> {saving ? "Generating…" : "Download PDF"}</button></div>
         </div>
+
+        <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2">
+          <InsightCell title="Strengths" marker="bg-hue-lime" items={analysis.strengths.map((item) => item.label)} empty="Consistent profile across the current measures." />
+          <InsightCell title="Focus for coaching" marker="bg-hue-orange" items={analysis.focus.map((item) => item.label)} empty="Continue the current all-round routine." />
+        </div>
+
+        <p className="border-t border-line pt-4 text-[12.5px] leading-relaxed text-faint">
+          This report compares fitness performance with students in the same school and grade. It supports sports coaching and is not medical advice. BMI needs age- and sex-specific percentile data before any clinical interpretation.
+        </p>
+
+        <div data-pdf-hide className="flex justify-end">
+          <PrimaryButton icon="download" onClick={downloadPdf} disabled={saving}>
+            {saving ? "Generating…" : "Download PDF"}
+          </PrimaryButton>
+        </div>
+      </div>
     </Modal>
   );
 }
 
-function Summary({ label, value, sub }: { label: string; value: string; sub: string }) { return <div className="rounded-xl border border-line bg-elevated p-4"><div className="text-[11px] uppercase tracking-wider text-faint">{label}</div><div className="mt-1 font-display text-lg font-bold text-content">{value}</div><div className="mt-1 text-xs text-muted">{sub}</div></div>; }
-function InsightBox({ title, tone, items, empty }: { title: string; tone: "emerald" | "amber"; items: string[]; empty: string }) { const isGreen = tone === "emerald"; return <div className={`rounded-xl border p-4 ${isGreen ? "border-emerald-500/30 bg-emerald-500/8" : "border-amber-500/30 bg-amber-500/8"}`}><div className={`mb-2 text-sm font-bold ${isGreen ? "text-emerald-500" : "text-amber-500"}`}>{title}</div>{items.length ? <ul className="space-y-1 text-sm text-content">{items.map((item) => <li key={item} className="flex items-center gap-2"><Icon name={isGreen ? "check" : "target"} size={14} />{item}</li>)}</ul> : <p className="text-sm text-muted">{empty}</p>}</div>; }
+// Shared by both report cards: the brand's field-blue band, the student's
+// name in the site's heavy display type, and the facts in mono.
+export function ReportHeader({
+  eyebrow,
+  name,
+  meta,
+  onClose,
+  children,
+}: {
+  eyebrow: string;
+  name: string;
+  meta: string[];
+  onClose: () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="relative overflow-hidden bg-klutch-field px-6 py-5 text-white">
+      <div
+        aria-hidden
+        className="court-lines pointer-events-none absolute -right-44 -top-10 h-[260px] w-[420px] opacity-[0.14]"
+      />
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <LogoMark size={38} className="mt-1 shrink-0" />
+          <div className="min-w-0">
+            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/70">{eyebrow}</div>
+            <div className="mt-1 font-display text-[1.875rem] font-black uppercase leading-[0.95] tracking-[-0.03em]">
+              {name}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px] text-white/75">
+              {meta.filter(Boolean).map((item) => <span key={item}>{item}</span>)}
+              {children}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          data-pdf-hide
+          className="rounded-sm p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Close"
+        >
+          <Icon name="x" size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCell({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="bg-surface p-4">
+      <div className="text-[12.5px] font-medium text-muted">{label}</div>
+      <div className="mt-1.5 font-display text-[1.0625rem] font-extrabold leading-snug tracking-[-0.015em] text-content">{value}</div>
+      <div className="mt-1 text-[12px] leading-snug text-muted">{sub}</div>
+    </div>
+  );
+}
+
+function InsightCell({ title, marker, items, empty }: { title: string; marker: string; items: string[]; empty: string }) {
+  return (
+    <div className="bg-surface p-4">
+      <div className="mb-2.5 font-display text-[15px] font-extrabold tracking-[-0.015em] text-content">{title}</div>
+      {items.length ? (
+        <ul className="space-y-1.5 text-sm text-content">
+          {items.map((item) => (
+            <li key={item} className="flex items-center gap-2.5">
+              <span className={`h-[7px] w-[7px] shrink-0 rounded-[1px] ${marker}`} />
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">{empty}</p>
+      )}
+    </div>
+  );
+}

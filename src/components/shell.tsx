@@ -97,7 +97,7 @@ export default function Shell() {
       {isAdmin && <Sidebar active={active} onGo={go} open={sidebarOpen} />}
       {isAdmin && sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+          className="fixed inset-0 z-20 bg-klutch-ink/60 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -118,8 +118,9 @@ export default function Shell() {
           <ModuleView m={shownModule} />
         </main>
 
-        <footer className="border-t border-line px-6 py-3 text-[11px] text-faint">
-          KLUTCH SportsEd · Internal ERP · {ROLE_LABEL[role]} view
+        <footer className="flex items-center justify-between gap-4 border-t border-line px-4 py-3 text-[12px] text-faint md:px-6">
+          <span>KLUTCH SportsEd internal ERP</span>
+          <span>{ROLE_LABEL[role]} view</span>
         </footer>
       </div>
 
@@ -137,23 +138,26 @@ function Sidebar({
   onGo: (m: ModuleKey) => void;
   open: boolean;
 }) {
+  // The sidebar is the brand's "field": the site's royal blue. It's the one
+  // saturated surface in the app; content stays quiet. (No court-line texture
+  // here — it ran behind nav labels and read as noise.)
   return (
     <aside
-      className={`fixed z-30 flex h-screen w-64 flex-col bg-klutch-ink bg-sidebar-glow text-slate-300 transition-transform md:sticky md:top-0 md:translate-x-0 ${
+      className={`fixed z-30 flex h-screen w-64 flex-col overflow-hidden bg-klutch-field-deep text-white transition-transform duration-300 ease-brand-out md:sticky md:top-0 md:translate-x-0 ${
         open ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      <div className="px-5 py-5">
-        <Logo size={34} className="text-white" />
-        <div className="mt-1.5 pl-[44px] text-[10px] uppercase tracking-[0.2em] text-slate-500">
+      <div className="relative px-5 pb-3 pt-5">
+        <Logo size={30} className="text-white" />
+        <div className="mt-2.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white/55">
           Internal ERP
         </div>
       </div>
 
-      <div className="scrollbar-thin flex-1 overflow-y-auto px-3 pb-6">
+      <nav className="scrollbar-thin relative flex-1 overflow-y-auto px-3 pb-6">
         {ADMIN_NAV.map((section) => (
-          <div key={section.label} className="mb-4">
-            <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <div key={section.label} className="mt-4 first:mt-2">
+            <div className="px-3 pb-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-white/50">
               {section.label}
             </div>
             {section.items.map((item) => {
@@ -162,23 +166,17 @@ function Sidebar({
                 <button
                   key={item.key}
                   onClick={() => onGo(item.key)}
-                  className={`group relative mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                  aria-current={isActive ? "page" : undefined}
+                  className={`mb-px flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-[14px] transition-colors ${
                     isActive
-                      ? "bg-white/[0.06] font-semibold text-white"
-                      : "text-slate-400 hover:bg-white/[0.04] hover:text-white"
+                      ? "bg-klutch-field font-semibold text-white"
+                      : "text-white/75 hover:bg-white/[0.08] hover:text-white"
                   }`}
                 >
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-brand-gradient" />
-                  )}
                   <Icon
                     name={item.icon}
-                    size={18}
-                    className={
-                      isActive
-                        ? "text-klutch-orange-bright"
-                        : "text-slate-500 group-hover:text-klutch-blue-bright"
-                    }
+                    size={17}
+                    className={isActive ? "text-white" : "text-white/55"}
                   />
                   {item.label}
                 </button>
@@ -186,11 +184,10 @@ function Sidebar({
             })}
           </div>
         ))}
-      </div>
+      </nav>
 
-      <div className="flex items-center gap-2 border-t border-white/5 px-5 py-4 text-[11px] text-slate-500">
-        <span className="h-2 w-2 shrink-0 animate-pulse-dot rounded-full bg-klutch-tennis" />
-        Rs.0 infra · React + Supabase-ready
+      <div className="relative border-t border-white/10 px-5 py-4 font-mono text-[10.5px] uppercase tracking-[0.16em] text-white/45">
+        Sport. Structure. Science.
       </div>
     </aside>
   );
@@ -216,19 +213,19 @@ function TopBar({
   showLogo: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface/80 px-4 py-3 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur md:px-6">
       <div className="flex min-w-0 items-center gap-3">
         {showBurger && (
           <button
             onClick={onToggleSidebar}
-            className="rounded-lg border border-line p-2 text-content md:hidden"
+            className="rounded-sm border border-line p-2 text-content md:hidden"
             aria-label="Toggle menu"
           >
             <Icon name="menu" size={18} />
           </button>
         )}
         {showLogo && <LogoMark size={30} className="shrink-0" />}
-        <h1 className="truncate font-display text-lg font-bold text-content md:text-xl">
+        <h1 className="truncate font-display text-[1.375rem] font-black uppercase leading-none tracking-[-0.025em] text-content">
           {title}
         </h1>
       </div>
@@ -237,9 +234,10 @@ function TopBar({
         {onSwitchRole && <RoleSwitcher role={role} onSwitchRole={onSwitchRole} />}
         <ThemeToggle />
         <div className="hidden items-center gap-2 sm:flex">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-gradient text-xs font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-klutch-field text-[11px] font-semibold text-white">
             {userName
-              .split(/[@\s]/)
+              .split(/[@\s.]/)
+              .filter(Boolean)
               .map((s) => s[0])
               .slice(0, 2)
               .join("")
@@ -249,11 +247,11 @@ function TopBar({
         </div>
         <button
           onClick={onSignOut}
-          className="rounded-lg border border-line p-2 text-muted transition hover:border-klutch-blue-bright hover:text-content"
+          className="flex h-9 w-9 items-center justify-center rounded-sm border border-line text-muted transition-colors hover:border-accent hover:text-accent"
           aria-label="Sign out"
           title="Sign out"
         >
-          <Icon name="x" size={16} />
+          <Icon name="log-out" size={16} />
         </button>
       </div>
     </header>
@@ -269,14 +267,19 @@ function RoleSwitcher({
 }) {
   const roles: Role[] = ["admin", "coach", "school"];
   return (
-    <div className="flex items-center rounded-full border border-line bg-elevated p-0.5">
+    <div
+      role="group"
+      aria-label="View as"
+      className="flex items-center rounded-sm border border-line bg-elevated p-0.5"
+    >
       {roles.map((r) => (
         <button
           key={r}
           onClick={() => onSwitchRole(r)}
-          className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition ${
+          aria-pressed={role === r}
+          className={`rounded-[1px] px-3 py-1 text-xs font-semibold capitalize transition-colors ${
             role === r
-              ? "bg-brand-gradient text-white shadow-brand"
+              ? "bg-klutch-field text-white"
               : "text-muted hover:text-content"
           }`}
         >

@@ -12,6 +12,7 @@ import {
   RatingPill,
   SportBadge,
   StatCard,
+  StatGrid,
   StatusTag,
   Table,
   Td,
@@ -65,8 +66,9 @@ export default function SchoolPortal() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-muted">Viewing:</span>
+          <label htmlFor="school-select" className="text-sm font-semibold text-muted">School</label>
           <select
+            id="school-select"
             value={schoolId}
             onChange={(e) => setCurrentSchoolId(e.target.value)}
             className="k-field w-auto font-semibold"
@@ -78,27 +80,27 @@ export default function SchoolPortal() {
             ))}
           </select>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-klutch-blue/10 px-3 py-1 text-xs font-semibold text-klutch-blue-bright">
-          <Icon name="school" size={13} /> Scoped to own data only
+        <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">
+          <Icon name="school" size={14} className="text-accent" /> Shows this school’s data only
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatGrid cols={4}>
         <StatCard label="Classes" icon="curriculum" tone="blue" value={schoolClassIds.length} />
         <StatCard
-          label="Sessions Done"
+          label="Sessions done"
           icon="check-circle"
           tone="tennis"
           value={`${doneCount}/${schoolSessions.length}`}
         />
         <StatCard
-          label="Students Assessed"
+          label="Students assessed"
           icon="assessment"
           tone="orange"
           value={schoolAssessments.length}
         />
         <StatCard
-          label="Avg Curriculum Wk"
+          label="Average curriculum week"
           icon="target"
           tone="neutral"
           value={
@@ -110,17 +112,19 @@ export default function SchoolPortal() {
               : 0
           }
         />
-      </div>
+      </StatGrid>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-line">
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
         {TABS.map((t) => (
           <button
             key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
               tab === t.key
-                ? "border-klutch-orange text-content"
+                ? "border-hue-orange text-content"
                 : "border-transparent text-faint hover:text-content"
             }`}
           >
@@ -138,7 +142,7 @@ export default function SchoolPortal() {
               <Th>Sport</Th>
               <Th>Date</Th>
               <Th>Coach</Th>
-              <Th>Curr. Week</Th>
+              <Th>Week</Th>
               <Th>Status</Th>
             </THead>
             <tbody>
@@ -150,9 +154,9 @@ export default function SchoolPortal() {
                       {cls?.className}
                     </Td>
                     <Td>{cls && <SportBadge sport={cls.sport} />}</Td>
-                    <Td>{s.date}</Td>
+                    <Td className="font-mono text-[13px]">{s.date}</Td>
                     <Td>{coachName(s.coachId)}</Td>
-                    <Td>Wk {s.curriculumWeek}</Td>
+                    <Td className="font-mono text-[13px]">Wk {s.curriculumWeek}</Td>
                     <Td>
                       <StatusTag value={s.status} />
                     </Td>
@@ -179,12 +183,12 @@ export default function SchoolPortal() {
                     {cls?.className}
                     {cls && <SportBadge sport={cls.sport} showLabel={false} />}
                   </div>
-                  <div className="text-sm font-bold text-klutch-blue-bright">
+                  <div className="font-mono text-sm font-bold text-accent">
                     Wk {cw.currentWeek}/{cw.totalWeeks}
                   </div>
                 </div>
                 <div className="mt-3">
-                  <Meter value={pctVal} tone="gradient" />
+                  <Meter value={pctVal} tone="blue" />
                 </div>
               </Card>
             );
@@ -228,36 +232,38 @@ export default function SchoolPortal() {
 
       {tab === "Report" && (
         <Card className="p-6">
-          <div className="rounded-2xl border border-dashed border-klutch-blue/40 bg-brand-gradient-soft p-6 text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-brand">
-              <Icon name="download" size={22} />
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-klutch-field text-white">
+              <Icon name="download" size={20} />
             </div>
-            <div className="font-display text-lg font-bold text-content">
-              Monthly Report — {schoolName(schoolId)}
+            <div>
+              <div className="font-display text-[1.25rem] font-extrabold tracking-[-0.02em] text-content">
+                June 2025 monthly report
+              </div>
+              <div className="text-sm text-muted">{schoolName(schoolId)}</div>
+              <p className="mt-2 max-w-lg text-sm text-muted">
+                A PDF summary of sessions delivered, cancellations, curriculum
+                progress and student assessments.
+              </p>
             </div>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-              Auto-generated PDF summarizing sessions delivered, cancellations,
-              curriculum progress, and student assessment summaries for June
-              2025.
-            </p>
-            <div className="mt-4 flex justify-center">
-              <PrimaryButton
-                icon="download"
-                onClick={() =>
-                  toast(`Monthly report for ${schoolName(schoolId)} generated (demo)`)
-                }
-              >
-                Download Monthly Report (PDF)
-              </PrimaryButton>
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3 text-left">
-              <MiniStat
-                label="Sessions Done"
-                value={`${doneCount}/${schoolSessions.length}`}
-              />
-              <MiniStat label="Classes" value={schoolClassIds.length} />
-              <MiniStat label="Students" value={schoolAssessments.length} />
-            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
+            <MiniStat
+              label="Sessions done"
+              value={`${doneCount}/${schoolSessions.length}`}
+            />
+            <MiniStat label="Classes" value={schoolClassIds.length} />
+            <MiniStat label="Students" value={schoolAssessments.length} />
+          </div>
+          <div className="mt-5">
+            <PrimaryButton
+              icon="download"
+              onClick={() =>
+                toast(`Monthly report for ${schoolName(schoolId)} generated (demo)`)
+              }
+            >
+              Download monthly report
+            </PrimaryButton>
           </div>
         </Card>
       )}
@@ -267,11 +273,9 @@ export default function SchoolPortal() {
 
 function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-3">
-      <div className="text-[11px] uppercase tracking-wider text-faint">
-        {label}
-      </div>
-      <div className="font-display text-xl font-bold text-content">{value}</div>
+    <div className="bg-surface p-3">
+      <div className="text-[12.5px] font-medium text-muted">{label}</div>
+      <div className="mt-1 font-display text-[1.5rem] font-black tracking-[-0.03em] text-content">{value}</div>
     </div>
   );
 }

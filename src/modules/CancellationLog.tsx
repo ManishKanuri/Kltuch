@@ -57,11 +57,11 @@ export default function CancellationLog() {
         icon="cancel"
         right={
           <PrimaryButton icon="plus" onClick={() => setOpen((v) => !v)}>
-            Log Cancellation
+            Log cancellation
           </PrimaryButton>
         }
       >
-        Cancellation Log
+        Cancellations
       </SectionTitle>
 
       {open && (
@@ -78,14 +78,13 @@ export default function CancellationLog() {
                   const cls = classById(s.classId);
                   return (
                     <option key={s.id} value={s.id}>
-                      {cls ? schoolName(cls.schoolId) : ""} · {cls?.className} ·{" "}
-                      {s.date}
+                      {cls ? schoolName(cls.schoolId) : ""}, {cls?.className}, {s.date}
                     </option>
                   );
                 })}
               </select>
             </Field>
-            <Field label="Cancelled By">
+            <Field label="Cancelled by">
               <select
                 value={cancelledBy}
                 onChange={(e) => setCancelledBy(e.target.value as CancelledBy)}
@@ -106,7 +105,7 @@ export default function CancellationLog() {
                 ))}
               </select>
             </Field>
-            <Field label="Rescheduled Date (optional)">
+            <Field label="Rescheduled date (optional)">
               <input
                 type="date"
                 value={reschedule}
@@ -117,7 +116,7 @@ export default function CancellationLog() {
           </div>
           <div className="mt-3">
             <PrimaryButton icon="check" onClick={submit}>
-              Save Cancellation
+              Save cancellation
             </PrimaryButton>
           </div>
         </Card>
@@ -129,14 +128,14 @@ export default function CancellationLog() {
             <Th>Date</Th>
             <Th>School</Th>
             <Th>Class</Th>
-            <Th>Cancelled By</Th>
+            <Th>Cancelled by</Th>
             <Th>Reason</Th>
-            <Th>Rescheduled?</Th>
+            <Th>Rescheduled</Th>
           </THead>
           <tbody>
             {cancellationRows.map((r, i) => (
               <Tr key={r.id} i={i}>
-                <Td>{r.date}</Td>
+                <Td className="font-mono text-[13px]">{r.date}</Td>
                 <Td className="font-semibold text-content">
                   {r.schoolId ? schoolName(r.schoolId) : "—"}
                 </Td>
@@ -147,7 +146,7 @@ export default function CancellationLog() {
                 <Td>{r.reason}</Td>
                 <Td>
                   {r.rescheduledDate ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-500">
+                    <span className="inline-flex items-center gap-1 font-mono text-[13px] text-good">
                       <Icon name="check" size={13} /> {r.rescheduledDate}
                     </span>
                   ) : (
@@ -175,11 +174,11 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-muted">
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-semibold text-content">
         {label}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   );
 }

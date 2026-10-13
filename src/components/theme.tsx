@@ -8,9 +8,10 @@ type Theme = "dark" | "light";
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("dark");
 
+  // The <head> script in layout.tsx already applied the saved theme before
+  // paint; read it back from the DOM so the icon matches what's on screen.
   useEffect(() => {
-    const stored = (localStorage.getItem("klutch-theme") as Theme) || "dark";
-    setTheme(stored);
+    setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
 
   function toggle() {
@@ -23,9 +24,9 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="group relative flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-content transition hover:border-klutch-blue-bright hover:text-klutch-blue-bright"
-      aria-label={`Switch to ${theme === "dark" ? "day" : "night"} mode`}
-      title={theme === "dark" ? "Night mode" : "Day mode"}
+      className="flex h-9 w-9 items-center justify-center rounded-sm border border-line bg-surface text-content transition-colors hover:border-accent hover:text-accent"
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      title={theme === "dark" ? "Dark mode" : "Light mode"}
     >
       <Icon name={theme === "dark" ? "moon" : "sun"} size={17} />
     </button>

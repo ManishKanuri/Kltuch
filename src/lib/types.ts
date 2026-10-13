@@ -23,11 +23,12 @@ export type Sport = "Football" | "Basketball" | "Tennis";
 
 export const SPORTS: Sport[] = ["Football", "Basketball", "Tennis"];
 
-// Categorical brand color per sport (paired with icon + label everywhere).
+// Categorical brand hue per sport (paired with icon + label everywhere).
+// Theme-aware: resolves to the brighter on-dark variant in dark mode.
 export const SPORT_COLOR: Record<Sport, string> = {
-  Football: "#2244db",
-  Basketball: "#f26b1d",
-  Tennis: "#a6ce2e",
+  Football: "rgb(var(--hue-blue))",
+  Basketball: "rgb(var(--hue-orange))",
+  Tennis: "rgb(var(--hue-lime))",
 };
 
 export const SPORT_ICON: Record<Sport, "football" | "basketball" | "tennis"> = {

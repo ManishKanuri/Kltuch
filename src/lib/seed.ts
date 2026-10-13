@@ -170,6 +170,3 @@ export const curriculum: CurriculumWeek[] = [
   { classId: "cl_xyz_5b", currentWeek: 3, totalWeeks: 12, lastDelivered: "2025-05-26" },
   { classId: "cl_mno_7b", currentWeek: 5, totalWeeks: 12, lastDelivered: "2025-05-27" },
 ];
-
-// The signed-in coach for the Coach Mobile View demo
-export const CURRENT_COACH_ID = "co_priya";

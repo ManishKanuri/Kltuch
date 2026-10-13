@@ -1,12 +1,14 @@
 import type { Config } from "tailwindcss";
 
+// Tokens mirror www.klutchsportsedu.com's :root variables (field, ink, paper,
+// rule, cta, lime) so the dashboard and the marketing site share one brand.
 export default {
   darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       colors: {
-        // Semantic tokens — flip between light/dark via CSS vars (globals.css)
+        // Theme-aware surfaces + text — flip between light/dark via CSS vars (globals.css)
         bg: "rgb(var(--bg) / <alpha-value>)",
         surface: "rgb(var(--surface) / <alpha-value>)",
         elevated: "rgb(var(--elevated) / <alpha-value>)",
@@ -15,40 +17,59 @@ export default {
         faint: "rgb(var(--faint) / <alpha-value>)",
         line: "rgb(var(--line) / <alpha-value>)",
 
-        // KLUTCH brand — fixed in both themes (from the logo)
-        klutch: {
-          blue: "#2244db",
-          "blue-bright": "#4f7bff",
-          orange: "#f26b1d",
-          "orange-bright": "#ff8a3d",
-          tennis: "#c7ee3e",
-          "tennis-deep": "#a6ce2e",
-          ink: "#0a0b0d",
+        // Text-safe semantic colors (contrast-checked per theme)
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        good: "rgb(var(--good) / <alpha-value>)",
+        warn: "rgb(var(--warn) / <alpha-value>)",
+        bad: "rgb(var(--bad) / <alpha-value>)",
+
+        // Brand hues for fills (bars, markers, icons) — brighter on dark
+        hue: {
+          blue: "rgb(var(--hue-blue) / <alpha-value>)",
+          orange: "rgb(var(--hue-orange) / <alpha-value>)",
+          lime: "rgb(var(--hue-lime) / <alpha-value>)",
+          amber: "rgb(var(--hue-amber) / <alpha-value>)",
         },
 
-        // Sport identity (categorical — always paired with icon + label)
-        sport: {
-          football: "#2244db",
-          basketball: "#f26b1d",
-          tennis: "#a6ce2e",
+        // Fixed brand colors — same in both themes
+        klutch: {
+          field: "#123AD6",
+          "field-deep": "#0A2288",
+          "field-line": "#1E3F86",
+          ink: "#0B1228",
+          cta: "#CC3A11",
+          "cta-hover": "#B5300D",
+          lime: "#9FC516",
+          // on-dark variants, for fixed navy/blue surfaces (sidebar, report panels)
+          "blue-bright": "#4E7BFF",
+          "orange-bright": "#FF7043",
+          "lime-bright": "#C6E24A",
         },
       },
-      backgroundImage: {
-        "brand-gradient": "linear-gradient(120deg, #2244db 0%, #7a3fb0 45%, #f26b1d 100%)",
-        "brand-gradient-soft":
-          "linear-gradient(120deg, rgba(34,68,219,0.14), rgba(242,107,29,0.14))",
-        "sidebar-glow":
-          "radial-gradient(120% 60% at 0% 0%, rgba(34,68,219,0.35), transparent 60%), radial-gradient(90% 50% at 100% 100%, rgba(242,107,29,0.18), transparent 55%)",
+      // Brand geometry is square: 2px controls, 4px containers. The scale is
+      // compressed on purpose so every rounded-* in the app reads as the brand.
+      borderRadius: {
+        sm: "2px",
+        DEFAULT: "2px",
+        md: "3px",
+        lg: "4px",
+        xl: "4px",
+        "2xl": "4px",
+        "3xl": "6px",
       },
       boxShadow: {
-        brand: "0 10px 34px -8px rgba(34,68,219,0.45)",
-        "brand-orange": "0 10px 34px -8px rgba(242,107,29,0.45)",
-        card: "0 1px 2px rgba(10,11,13,0.06), 0 6px 20px -12px rgba(10,11,13,0.25)",
-        "card-dark": "0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.6)",
+        card: "0 1px 0 rgba(11, 18, 40, 0.04)",
+        "card-dark": "none",
+        modal: "0 24px 64px -16px rgba(4, 14, 52, 0.55)",
       },
       fontFamily: {
         display: ["var(--font-display)", "system-ui", "sans-serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+      },
+      transitionTimingFunction: {
+        brand: "cubic-bezier(.22,.61,.36,1)",
+        "brand-out": "cubic-bezier(.16,1,.3,1)",
       },
       keyframes: {
         "pulse-dot": {
@@ -66,8 +87,8 @@ export default {
       },
       animation: {
         "pulse-dot": "pulse-dot 1.6s ease-in-out infinite",
-        "fade-up": "fade-up 0.35s ease-out both",
-        "grow-bar": "grow-bar 0.7s cubic-bezier(0.22,1,0.36,1) both",
+        "fade-up": "fade-up 0.3s cubic-bezier(.16,1,.3,1) both",
+        "grow-bar": "grow-bar 0.7s cubic-bezier(.16,1,.3,1) both",
       },
     },
   },

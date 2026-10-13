@@ -2,27 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------- Theme tokens (space-separated RGB channels for <alpha-value>) ---------- */
+/* ---------- Theme tokens (space-separated RGB channels for <alpha-value>) ----------
+   Light = the site's paper/ink; dark = the site's navy ink, never neutral black. */
 :root {
-  /* light / "day" mode */
-  --bg: 240 242 246;
-  --surface: 255 255 255;
-  --elevated: 248 250 252;
-  --content: 12 15 22;
-  --muted: 92 104 120;
-  --faint: 148 160 176;
-  --line: 224 228 236;
+  --bg: 242 243 246;        /* paper  #F2F3F6 */
+  --surface: 255 255 255;   /* paper-2 */
+  --elevated: 246 247 250;
+  --content: 11 18 40;      /* ink    #0B1228 */
+  --muted: 78 90 120;       /* ink-2  #4E5A78 */
+  --faint: 99 110 137;      /* ink-3  #636E89 */
+  --line: 201 207 221;      /* rule   #C9CFDD */
+
+  --accent: 18 58 214;      /* field  #123AD6 */
+  --good: 78 110 0;         /* lime, darkened to stay legible on paper */
+  --warn: 154 103 0;
+  --bad: 181 48 13;         /* cta-hover */
+
+  --hue-blue: 18 58 214;
+  --hue-orange: 204 58 17;  /* cta */
+  --hue-lime: 159 197 22;   /* lime */
+  --hue-amber: 224 161 0;
+
+  --focus: 204 58 17;
 }
 
 .dark {
-  /* dark / "night" mode */
-  --bg: 8 9 13;
-  --surface: 20 22 29;
-  --elevated: 27 30 39;
-  --content: 236 239 245;
-  --muted: 150 161 178;
-  --faint: 96 106 122;
-  --line: 38 42 54;
+  --bg: 7 11 26;
+  --surface: 14 22 46;
+  --elevated: 20 30 58;
+  --content: 247 249 255;   /* field-ink */
+  --muted: 168 178 202;
+  --faint: 124 136 166;
+  --line: 33 44 77;
+
+  --accent: 128 152 255;
+  --good: 198 226 74;
+  --warn: 242 181 58;
+  --bad: 255 112 67;
+
+  --hue-blue: 78 123 255;
+  --hue-orange: 255 112 67;
+  --hue-lime: 198 226 74;
+  --hue-amber: 242 181 58;
+
+  --focus: 255 112 67;
 }
 
 html,
@@ -34,11 +57,33 @@ body {
   background-color: rgb(var(--bg));
   color: rgb(var(--content));
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.3s cubic-bezier(.22,.61,.36,1), color 0.3s cubic-bezier(.22,.61,.36,1);
+}
+
+/* Archivo is a variable font; the site sets headings at width 106. */
+.font-display {
+  font-variation-settings: "wdth" 106;
 }
 
 ::selection {
-  background: rgba(242, 107, 29, 0.3);
+  background: rgba(198, 226, 74, 0.5);
+  color: #0b1228;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(var(--focus));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---------- Scrollbars ---------- */
@@ -47,7 +92,7 @@ body {
   height: 8px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(34, 68, 219, 0.35);
+  background: rgb(var(--accent) / 0.35);
   border-radius: 999px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
@@ -55,31 +100,32 @@ body {
 }
 
 @layer components {
-  /* Brand gradient text (wordmark / hero numbers) */
-  .text-gradient {
-    background: linear-gradient(115deg, #4f7bff 0%, #f26b1d 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
   /* Alternating table row — theme aware */
   .row-alt {
-    background-color: rgb(var(--content) / 0.025);
+    background-color: rgb(var(--content) / 0.022);
   }
 
-  /* Inputs / selects */
+  /* Inputs / selects — square, hairline, field-blue focus */
   .k-field {
-    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-content outline-none transition;
+    @apply w-full rounded-sm border border-line bg-surface px-3 py-2 text-sm text-content outline-none transition-colors;
   }
   .k-field:focus {
-    border-color: #4f7bff;
-    box-shadow: 0 0 0 3px rgba(79, 123, 255, 0.18);
+    border-color: rgb(var(--accent));
+    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
+  }
+  .k-field::placeholder {
+    color: rgb(var(--faint));
   }
 
-  /* Meter track */
+  /* Meter track — the site's 6px pill bar */
   .meter {
-    @apply h-2 w-full overflow-hidden rounded-full;
-    background-color: rgb(var(--content) / 0.08);
+    @apply h-1.5 w-full overflow-hidden rounded-full;
+    background-color: rgb(var(--content) / 0.1);
+  }
+
+  /* Faint court markings — the brand's signature texture, for fixed-blue surfaces */
+  .court-lines {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='260' viewBox='0 0 420 260' fill='none' stroke='%23F7F9FF' stroke-width='1.5'%3E%3Crect x='10' y='10' width='400' height='240'/%3E%3Cline x1='210' y1='10' x2='210' y2='250'/%3E%3Ccircle cx='210' cy='130' r='38'/%3E%3Crect x='10' y='70' width='60' height='120'/%3E%3Crect x='350' y='70' width='60' height='120'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
   }
 }

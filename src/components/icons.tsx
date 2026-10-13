@@ -37,7 +37,8 @@ export type IconName =
   | "wave"
   | "football"
   | "basketball"
-  | "tennis";
+  | "tennis"
+  | "log-out";
 
 const P: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -148,6 +149,13 @@ const P: Record<IconName, React.ReactNode> = {
   "chevron-right": <path d="m9 6 6 6-6 6" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  "log-out": (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  ),
   trophy: (
     <>
       <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />

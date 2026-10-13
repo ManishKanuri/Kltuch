@@ -19,12 +19,12 @@ export const Modal = forwardRef<
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-klutch-ink/70 p-4 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
         ref={ref}
-        className={`animate-fade-up scrollbar-thin max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl ${className}`}
+        className={`animate-fade-up scrollbar-thin max-h-[90vh] w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-modal ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
@@ -35,28 +35,29 @@ export const Modal = forwardRef<
 });
 
 // ---------------- Status tags ----------------
-const STATUS_STYLES: Record<string, string> = {
-  Done: "bg-emerald-500/12 text-emerald-500 ring-emerald-500/25",
-  Present: "bg-emerald-500/12 text-emerald-500 ring-emerald-500/25",
-  Active: "bg-emerald-500/12 text-emerald-500 ring-emerald-500/25",
-  Good: "bg-emerald-500/12 text-emerald-500 ring-emerald-500/25",
-  Pending: "bg-amber-500/14 text-amber-500 ring-amber-500/25",
-  Fair: "bg-amber-500/14 text-amber-500 ring-amber-500/25",
-  Absent: "bg-rose-500/12 text-rose-500 ring-rose-500/25",
-  Cancelled: "bg-rose-500/12 text-rose-500 ring-rose-500/25",
-  Damaged: "bg-rose-500/12 text-rose-500 ring-rose-500/25",
-  Replace: "bg-rose-500/12 text-rose-500 ring-rose-500/25",
-  Inactive: "bg-content/10 text-muted ring-content/15",
-  School: "bg-klutch-blue/15 text-klutch-blue-bright ring-klutch-blue/30",
-  KLUTCH: "bg-klutch-orange/15 text-klutch-orange-bright ring-klutch-orange/30",
+// Neutral mono word + a colored square marker, the same treatment as the
+// status words on the site's report card. Keeping the text in the content
+// color (not the hue) keeps lime/amber legible on paper.
+const STATUS_MARKER: Record<string, string> = {
+  Done: "bg-hue-lime",
+  Present: "bg-hue-lime",
+  Active: "bg-hue-lime",
+  Good: "bg-hue-lime",
+  Pending: "bg-hue-amber",
+  Fair: "bg-hue-amber",
+  Absent: "bg-hue-orange",
+  Cancelled: "bg-hue-orange",
+  Damaged: "bg-hue-orange",
+  Replace: "bg-hue-orange",
+  Inactive: "bg-faint",
+  School: "bg-hue-blue",
+  KLUTCH: "bg-hue-orange",
 };
 
 export function StatusTag({ value }: { value: string }) {
-  const cls = STATUS_STYLES[value] ?? "bg-content/8 text-muted ring-content/15";
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ring-1 ${cls}`}
-    >
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-content">
+      <span className={`h-[7px] w-[7px] shrink-0 rounded-[1px] ${STATUS_MARKER[value] ?? "bg-faint"}`} />
       {value}
     </span>
   );
@@ -71,15 +72,37 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div
-      className={`rounded-2xl border border-line bg-surface shadow-card dark:shadow-card-dark ${className}`}
-    >
+    <div className={`rounded-lg border border-line bg-surface ${className}`}>
       {children}
     </div>
   );
 }
 
-// ---------------- Stat card ----------------
+// ---------------- Stat grid + stat card ----------------
+// Stats sit in one hairline-joined strip (like the site's offer grid) rather
+// than as separate floating cards. StatCard is a cell; StatGrid is the frame.
+export function StatGrid({
+  cols,
+  children,
+}: {
+  cols: 3 | 4;
+  children: React.ReactNode;
+}) {
+  const layout = cols === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+  return (
+    <div className={`grid gap-px overflow-hidden rounded-lg border border-line bg-line ${layout}`}>
+      {children}
+    </div>
+  );
+}
+
+const STAT_ICON_TONE = {
+  blue: "text-accent",
+  orange: "text-bad",
+  tennis: "text-good",
+  neutral: "text-faint",
+} as const;
+
 export function StatCard({
   label,
   value,
@@ -91,42 +114,18 @@ export function StatCard({
   value: React.ReactNode;
   sub?: React.ReactNode;
   icon?: IconName;
-  tone?: "blue" | "orange" | "tennis" | "neutral";
+  tone?: keyof typeof STAT_ICON_TONE;
 }) {
-  const bar =
-    tone === "orange"
-      ? "before:bg-klutch-orange"
-      : tone === "tennis"
-        ? "before:bg-klutch-tennis-deep"
-        : tone === "neutral"
-          ? "before:bg-line"
-          : "before:bg-klutch-blue";
-  const iconTone =
-    tone === "orange"
-      ? "bg-klutch-orange/12 text-klutch-orange"
-      : tone === "tennis"
-        ? "bg-klutch-tennis-deep/12 text-klutch-tennis-deep"
-        : tone === "neutral"
-          ? "bg-content/8 text-faint"
-          : "bg-klutch-blue/12 text-klutch-blue-bright";
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card dark:shadow-card-dark before:absolute before:inset-x-0 before:top-0 before:h-[3px] ${bar}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-faint">
-          {label}
-        </div>
-        {icon && (
-          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconTone}`}>
-            <Icon name={icon} size={15} />
-          </div>
-        )}
+    <div className="bg-surface p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-muted">{label}</span>
+        {icon && <Icon name={icon} size={16} className={STAT_ICON_TONE[tone]} />}
       </div>
-      <div className="mt-2 font-display text-4xl font-extrabold leading-none tracking-tight text-content">
+      <div className="mt-3 font-display text-[2.5rem] font-black leading-none tracking-[-0.035em] tabular-nums text-content">
         {value}
       </div>
-      {sub ? <div className="mt-1.5 text-xs text-muted">{sub}</div> : null}
+      {sub ? <div className="mt-2 text-[13px] text-muted">{sub}</div> : null}
     </div>
   );
 }
@@ -142,10 +141,9 @@ export function SectionTitle({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2.5 font-display text-base font-bold text-content">
-        <span className="h-5 w-1.5 rounded-full bg-brand-gradient" />
-        {icon && <Icon name={icon} size={18} className="text-klutch-blue-bright" />}
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <h2 className="flex items-center gap-2 font-display text-[1.1875rem] font-extrabold tracking-[-0.02em] text-content">
+        {icon && <Icon name={icon} size={17} className="text-accent" />}
         {children}
       </h2>
       {right}
@@ -154,6 +152,7 @@ export function SectionTitle({
 }
 
 // ---------------- Buttons ----------------
+// Primary = the site's solid orange CTA. No gradients, no glow.
 export function PrimaryButton({
   children,
   onClick,
@@ -172,7 +171,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+      className="inline-flex items-center justify-center gap-2 rounded-sm bg-klutch-cta px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-klutch-cta-hover active:translate-y-px disabled:cursor-not-allowed disabled:bg-content/[0.08] disabled:text-faint"
     >
       {icon && <Icon name={icon} size={16} />}
       {children}
@@ -192,15 +191,9 @@ export function OutlineButton({
   return (
     <button
       onClick={onClick}
-      className="group inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-content transition hover:border-klutch-blue-bright hover:text-klutch-blue-bright"
+      className="inline-flex items-center gap-2 rounded-sm border border-line bg-surface px-3.5 py-2 text-sm font-medium text-content transition-colors hover:border-accent hover:text-accent"
     >
-      {icon && (
-        <Icon
-          name={icon}
-          size={16}
-          className="text-klutch-blue-bright transition group-hover:scale-110"
-        />
-      )}
+      {icon && <Icon name={icon} size={16} className="text-accent" />}
       {children}
     </button>
   );
@@ -211,11 +204,16 @@ export function StarRating({
   value,
   onChange,
   size = 16,
+  onDark = false,
 }: {
   value: number;
   onChange?: (v: number) => void;
   size?: number;
+  // On the fixed navy report panel, theme colors would vanish in light mode.
+  onDark?: boolean;
 }) {
+  const on = onDark ? "text-klutch-orange-bright" : "text-hue-orange";
+  const off = onDark ? "text-white/25" : "text-content/20";
   return (
     <div className="inline-flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((n) => (
@@ -224,9 +222,9 @@ export function StarRating({
           type="button"
           disabled={!onChange}
           onClick={() => onChange?.(n)}
-          className={`${
-            n <= value ? "text-klutch-orange" : "text-content/20"
-          } ${onChange ? "cursor-pointer transition hover:scale-125" : "cursor-default"}`}
+          className={`${n <= value ? on : off} ${
+            onChange ? "cursor-pointer transition-opacity hover:opacity-75" : "cursor-default"
+          }`}
           aria-label={`${n} star`}
         >
           <StarGlyph filled={n <= value} size={size} />
@@ -237,31 +235,28 @@ export function StarRating({
 }
 
 export function RatingPill({ n }: { n: number }) {
-  const color =
-    n >= 4 ? "text-emerald-500" : n === 3 ? "text-amber-500" : "text-rose-500";
-  return <span className={`text-sm font-semibold ${color}`}>{n}/5</span>;
+  const color = n >= 4 ? "text-good" : n === 3 ? "text-warn" : "text-bad";
+  return <span className={`font-mono text-sm font-bold tabular-nums ${color}`}>{n}/5</span>;
 }
 
 // ---------------- Meter ----------------
+const METER_FILL = {
+  blue: "bg-hue-blue",
+  orange: "bg-hue-orange",
+  tennis: "bg-hue-lime",
+} as const;
+
 export function Meter({
   value,
   tone = "blue",
 }: {
   value: number; // 0-100
-  tone?: "blue" | "orange" | "tennis" | "gradient";
+  tone?: keyof typeof METER_FILL;
 }) {
-  const fill =
-    tone === "orange"
-      ? "bg-klutch-orange"
-      : tone === "tennis"
-        ? "bg-klutch-tennis-deep"
-        : tone === "gradient"
-          ? "bg-brand-gradient"
-          : "bg-klutch-blue";
   return (
     <div className="meter">
       <div
-        className={`h-full origin-left rounded-full ${fill} animate-grow-bar`}
+        className={`h-full origin-left rounded-full ${METER_FILL[tone]} animate-grow-bar`}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
@@ -269,6 +264,8 @@ export function Meter({
 }
 
 // ---------------- Sport badge ----------------
+// Icon carries the sport hue; the label stays in the content color so the
+// lime Tennis badge is still readable on paper.
 export function SportBadge({
   sport,
   showLabel = true,
@@ -277,15 +274,8 @@ export function SportBadge({
   showLabel?: boolean;
 }) {
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1"
-      style={{
-        color: SPORT_COLOR[sport],
-        backgroundColor: `${SPORT_COLOR[sport]}1f`,
-        boxShadow: `inset 0 0 0 1px ${SPORT_COLOR[sport]}40`,
-      }}
-    >
-      <Icon name={SPORT_ICON[sport]} size={13} />
+    <span className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-elevated px-1.5 py-0.5 text-[12px] font-medium text-content">
+      <Icon name={SPORT_ICON[sport]} size={13} style={{ color: SPORT_COLOR[sport] }} />
       {showLabel && sport}
     </span>
   );
@@ -295,7 +285,7 @@ export function SportBadge({
 export function Table({ children }: { children: React.ReactNode }) {
   return (
     <div className="scrollbar-thin overflow-x-auto">
-      <table className="w-full border-collapse text-sm">{children}</table>
+      <table className="w-full border-collapse text-sm tabular-nums">{children}</table>
     </div>
   );
 }
@@ -310,7 +300,7 @@ export function THead({ children }: { children: React.ReactNode }) {
 
 export function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="whitespace-nowrap px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-klutch-blue-bright">
+    <th className="whitespace-nowrap px-4 py-2.5 text-left text-[12px] font-semibold text-muted">
       {children}
     </th>
   );
@@ -339,7 +329,7 @@ export function Tr({
 }) {
   return (
     <tr
-      className={`border-b border-line/60 transition hover:bg-klutch-blue/[0.04] ${
+      className={`border-b border-line/70 transition-colors last:border-b-0 hover:bg-accent/[0.05] ${
         i % 2 === 1 ? "row-alt" : ""
       }`}
     >
@@ -390,8 +380,11 @@ function ToastItem({
     return () => clearTimeout(t);
   }, [id, onDone]);
   return (
-    <div className="animate-fade-up pointer-events-auto flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-content shadow-card dark:shadow-card-dark">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white">
+    <div
+      role="status"
+      className="animate-fade-up pointer-events-auto flex items-center gap-3 rounded-lg border border-white/10 bg-klutch-ink px-4 py-3 text-sm text-white shadow-modal"
+    >
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-klutch-lime-bright text-klutch-ink">
         <Icon name="check" size={14} strokeWidth={2.4} />
       </span>
       <span className="flex-1">{text}</span>

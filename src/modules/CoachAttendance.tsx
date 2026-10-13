@@ -3,7 +3,7 @@
 import { useStore } from "@/lib/store";
 import { TODAY } from "@/lib/seed";
 import { Icon } from "@/components/icons";
-import { Card, SectionTitle, StatCard, StatusTag } from "@/components/ui";
+import { Card, SectionTitle, StatCard, StatGrid, StatusTag } from "@/components/ui";
 
 export default function CoachAttendance() {
   const { coaches, attendance, toggleAttendance, schoolName, toast } =
@@ -16,9 +16,9 @@ export default function CoachAttendance() {
 
   return (
     <div className="space-y-4">
-      <SectionTitle icon="attendance">Coach Attendance — {TODAY}</SectionTitle>
+      <SectionTitle icon="attendance" right={<span className="font-mono text-[12px] text-faint">{TODAY}</span>}>Coach attendance</SectionTitle>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <StatGrid cols={3}>
         <StatCard
           label="Present"
           icon="check-circle"
@@ -34,13 +34,13 @@ export default function CoachAttendance() {
           sub="Not marked"
         />
         <StatCard
-          label="Total Coaches"
+          label="Total coaches"
           icon="coaches"
           tone="neutral"
           value={coaches.length}
           sub="Across all schools"
         />
-      </div>
+      </StatGrid>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {coaches.map((c) => {
@@ -65,14 +65,14 @@ export default function CoachAttendance() {
                     present ? `${c.name} marked absent` : `${c.name} marked present`
                   );
                 }}
-                className={`relative h-9 w-16 rounded-full transition ${
-                  present ? "bg-brand-gradient" : "bg-content/20"
+                className={`relative h-9 w-16 rounded-full transition-colors ${
+                  present ? "bg-klutch-field" : "bg-content/20"
                 }`}
                 aria-label={`Toggle ${c.name}`}
                 aria-pressed={present}
               >
                 <span
-                  className={`absolute top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow transition-all ${
+                  className={`absolute top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow transition-[left] duration-200 ease-brand-out ${
                     present ? "left-8" : "left-1"
                   }`}
                 >
@@ -80,7 +80,7 @@ export default function CoachAttendance() {
                     <Icon
                       name="check"
                       size={14}
-                      className="text-klutch-blue"
+                      className="text-klutch-field"
                       strokeWidth={2.6}
                     />
                   )}

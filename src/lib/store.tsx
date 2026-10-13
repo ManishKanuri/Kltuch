@@ -606,7 +606,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setRole,
       active,
       setActive,
-      currentCoachId: actualCoachId || seed.CURRENT_COACH_ID,
+      // A real coach login uses their own coach_id. An admin previewing the
+      // coach screen has none, so preview as the first real coach record.
+      currentCoachId: actualCoachId || coaches[0]?.id || "",
       currentSchoolId,
       setCurrentSchoolId,
       userEmail,

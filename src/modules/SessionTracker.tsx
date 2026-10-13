@@ -50,15 +50,16 @@ export default function SessionTracker() {
 
   return (
     <div className="space-y-4">
-      <SectionTitle icon="session">Session Tracker</SectionTitle>
+      <SectionTitle icon="session">Session tracker</SectionTitle>
 
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={schoolFilter}
           onChange={(e) => setSchoolFilter(e.target.value)}
+          aria-label="Filter by school"
           className="k-field w-auto"
         >
-          <option value="All">All Schools</option>
+          <option value="All">All schools</option>
           {schools.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -69,9 +70,10 @@ export default function SessionTracker() {
         <select
           value={sportFilter}
           onChange={(e) => setSportFilter(e.target.value as Sport | "All")}
+          aria-label="Filter by sport"
           className="k-field w-auto"
         >
-          <option value="All">All Sports</option>
+          <option value="All">All sports</option>
           {SPORTS.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -79,14 +81,15 @@ export default function SessionTracker() {
           ))}
         </select>
 
-        <div className="flex items-center gap-1 rounded-full border border-line bg-elevated p-0.5">
+        <div role="group" aria-label="Filter by status" className="flex items-center gap-0.5 rounded-sm border border-line bg-elevated p-0.5">
           {STATUSES.map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              aria-pressed={statusFilter === st}
+              className={`rounded-[1px] px-3 py-1.5 text-xs font-semibold transition-colors ${
                 statusFilter === st
-                  ? "bg-brand-gradient text-white"
+                  ? "bg-klutch-field text-white"
                   : "text-muted hover:text-content"
               }`}
             >
@@ -104,7 +107,7 @@ export default function SessionTracker() {
             <Th>Sport</Th>
             <Th>Date</Th>
             <Th>Coach</Th>
-            <Th>Curr. Week</Th>
+            <Th>Week</Th>
             <Th>Status</Th>
             <Th>Update</Th>
           </THead>
@@ -116,9 +119,9 @@ export default function SessionTracker() {
                 </Td>
                 <Td>{cls?.className}</Td>
                 <Td>{cls && <SportBadge sport={cls.sport} />}</Td>
-                <Td>{s.date}</Td>
+                <Td className="font-mono text-[13px]">{s.date}</Td>
                 <Td>{coachName(s.coachId)}</Td>
-                <Td>Wk {s.curriculumWeek}</Td>
+                <Td className="font-mono text-[13px]">Wk {s.curriculumWeek}</Td>
                 <Td>
                   <StatusTag value={s.status} />
                 </Td>
@@ -127,9 +130,10 @@ export default function SessionTracker() {
                     value={s.status}
                     onChange={(e) => {
                       setSessionStatus(s.id, e.target.value as SessionStatus);
-                      toast(`${cls?.className} → ${e.target.value}`);
+                      toast(`${cls?.className} marked ${e.target.value}`);
                     }}
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-content"
+                    aria-label={`Update status for ${cls?.className}`}
+                    className="rounded-sm border border-line bg-surface px-2 py-1 text-xs text-content"
                   >
                     <option>Done</option>
                     <option>Pending</option>

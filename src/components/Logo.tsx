@@ -31,24 +31,18 @@ export function Logo({
   showWordmark?: boolean;
   className?: string;
 }) {
+  // Wordmark matches the site header: "KLUTCH" heavy, "SportsEd" lighter.
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <LogoMark size={size} />
       {showWordmark && (
-        <div className="leading-none">
-          <div
-            className="font-display font-extrabold tracking-tight"
-            style={{ fontSize: size * 0.5 }}
-          >
-            KLUTCH
-          </div>
-          <div
-            className="font-display font-semibold uppercase text-klutch-orange"
-            style={{ fontSize: size * 0.24, letterSpacing: size * 0.05 }}
-          >
-            Sports.ed
-          </div>
-        </div>
+        <span
+          className="whitespace-nowrap font-display leading-none tracking-[-0.02em]"
+          style={{ fontSize: size * 0.56 }}
+        >
+          <span className="font-black">KLUTCH</span>{" "}
+          <span className="font-semibold opacity-70">SportsEd</span>
+        </span>
       )}
     </div>
   );

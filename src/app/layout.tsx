@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
-import { Sora, Inter } from "next/font/google";
+import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
+// Same three families as www.klutchsportsedu.com.
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  axes: ["wdth"],
   variable: "--font-display",
   display: "swap",
 });
 
-const inter = Inter({
+const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -21,6 +28,9 @@ export const metadata: Metadata = {
     "KLUTCH SportsEd operations platform — coach attendance, sessions, sports analytics, student report cards, equipment, and school reports.",
 };
 
+// Runs before first paint so a saved "light" preference never flashes dark.
+const themeScript = `try{if(localStorage.getItem("klutch-theme")==="light")document.documentElement.classList.remove("dark")}catch(e){}`;
+
 export default function RootLayout({
   children,
 }: {
@@ -28,7 +38,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${sora.variable} ${inter.variable} font-sans antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body
+        className={`${archivo.variable} ${instrumentSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+      >
         {children}
       </body>
     </html>
