@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { TODAY } from "@/lib/seed";
+import { monthLabel, todayISO } from "@/lib/dates";
 import { sportBreakdown } from "@/lib/stats";
 import { SPORT_COLOR, SPORT_ICON } from "@/lib/types";
 import { Icon } from "@/components/icons";
@@ -37,24 +37,25 @@ export default function Dashboard() {
     setActive,
     live,
   } = useStore();
+  const today = todayISO();
 
   const stats = useMemo(() => {
-    const today = sessions.filter((s) => s.date === TODAY);
-    const doneToday = today.filter((s) => s.status === "Done").length;
-    const pendingToday = today.filter((s) => s.status === "Pending").length;
+    const todaySessions = sessions.filter((s) => s.date === today);
+    const doneToday = todaySessions.filter((s) => s.status === "Done").length;
+    const pendingToday = todaySessions.filter((s) => s.status === "Pending").length;
     const presentToday = attendance.filter(
-      (a) => a.date === TODAY && a.present
+      (a) => a.date === today && a.present
     ).length;
     const assessedClassIds = new Set(assessments.map((a) => a.classId));
     const pendingAssessments = classes.filter(
       (c) => !assessedClassIds.has(c.id)
     ).length;
     const cancelMTD = cancellationRows.filter((r) =>
-      r.date.startsWith(TODAY.slice(0, 7))
+      r.date.startsWith(today.slice(0, 7))
     ).length;
     return {
       doneToday,
-      totalToday: today.length,
+      totalToday: todaySessions.length,
       pendingToday,
       presentToday,
       totalCoaches: coaches.length,
@@ -63,7 +64,7 @@ export default function Dashboard() {
       cancelMTD,
       fitnessAssessed: fitnessAssessments.length,
     };
-  }, [sessions, coaches, attendance, assessments, classes, cancellationRows, fitnessAssessments]);
+  }, [today, sessions, coaches, attendance, assessments, classes, cancellationRows, fitnessAssessments]);
 
   const sports = useMemo(
     () => sportBreakdown(classes, sessions),
@@ -89,7 +90,7 @@ export default function Dashboard() {
       "12:30 PM",
     ];
     return sessions
-      .filter((s) => s.date === TODAY)
+      .filter((s) => s.date === today)
       .map((s, i) => {
         const cls = classById(s.classId);
         return {
@@ -105,7 +106,7 @@ export default function Dashboard() {
           status: s.status,
         };
       });
-  }, [sessions, classById, coachName, schoolName]);
+  }, [today, sessions, classById, coachName, schoolName]);
 
   return (
     <div className="space-y-7">
@@ -146,7 +147,7 @@ export default function Dashboard() {
           icon="cancel"
           tone="neutral"
           value={stats.cancelMTD}
-          sub="June 2025"
+          sub={monthLabel(today)}
         />
       </StatGrid>
 

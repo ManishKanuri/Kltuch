@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { todayISO } from "@/lib/dates";
 import { analyzeStudent, skillStatusWord } from "@/lib/stats";
 import { SKILL_LABELS, type Assessment, type SkillKey } from "@/lib/types";
 import { Icon } from "@/components/icons";
@@ -63,7 +64,7 @@ export default function StudentAssessment() {
       classId,
       term,
       ratings,
-      date: "2025-06-02",
+      date: todayISO(),
     });
     toast(`Assessment saved for ${name.trim()}`);
     setName("");

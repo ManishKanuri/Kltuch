@@ -1,22 +1,23 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { TODAY } from "@/lib/seed";
+import { dayLabel, todayISO } from "@/lib/dates";
 import { Icon } from "@/components/icons";
 import { Card, SectionTitle, StatCard, StatGrid, StatusTag } from "@/components/ui";
 
 export default function CoachAttendance() {
   const { coaches, attendance, toggleAttendance, schoolName, toast } =
     useStore();
+  const today = todayISO();
 
   const presentCount = coaches.filter(
     (c) =>
-      attendance.find((a) => a.coachId === c.id && a.date === TODAY)?.present
+      attendance.find((a) => a.coachId === c.id && a.date === today)?.present
   ).length;
 
   return (
     <div className="space-y-4">
-      <SectionTitle icon="attendance" right={<span className="font-mono text-[12px] text-faint">{TODAY}</span>}>Coach attendance</SectionTitle>
+      <SectionTitle icon="attendance" right={<span className="text-[13px] text-muted">{dayLabel(today)}</span>}>Coach attendance</SectionTitle>
 
       <StatGrid cols={3}>
         <StatCard
@@ -45,7 +46,7 @@ export default function CoachAttendance() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {coaches.map((c) => {
           const present =
-            attendance.find((a) => a.coachId === c.id && a.date === TODAY)
+            attendance.find((a) => a.coachId === c.id && a.date === today)
               ?.present ?? false;
           return (
             <Card key={c.id} className="flex items-center justify-between p-4">

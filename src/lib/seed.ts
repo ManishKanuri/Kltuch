@@ -11,8 +11,6 @@ import type {
   Session,
 } from "./types";
 
-// Demo "today" — the brief's data is anchored to June 2025.
-export const TODAY = "2025-06-02";
 
 export const schools: School[] = [
   {

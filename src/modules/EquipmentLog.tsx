@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { todayISO } from "@/lib/dates";
 import type { EquipmentCondition, EquipmentStatus } from "@/lib/types";
 import {
   Card,
@@ -46,7 +47,7 @@ export default function EquipmentLog() {
       qty,
       schoolId,
       condition: "Good",
-      dateIssued: "2025-06-02",
+      dateIssued: todayISO(),
       status: "Active",
     });
     toast(`${item.trim()} added to inventory`);

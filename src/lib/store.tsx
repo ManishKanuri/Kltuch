@@ -27,7 +27,7 @@ import type {
   SkillKey,
 } from "./types";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import * as seed from "./seed";
+import { todayISO } from "./dates";
 import type { ModuleKey } from "./nav";
 import { createClient } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
@@ -393,7 +393,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const toggleAttendance = useCallback(
     (coachId: string) => {
       const existing = attendance.find(
-        (a) => a.coachId === coachId && a.date === seed.TODAY
+        (a) => a.coachId === coachId && a.date === todayISO()
       );
       if (existing) {
         const nextPresent = !existing.present;
@@ -410,10 +410,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const tempId = nid("at");
-      setAttendance((prev) => [...prev, { id: tempId, coachId, date: seed.TODAY, present: true }]);
+      setAttendance((prev) => [...prev, { id: tempId, coachId, date: todayISO(), present: true }]);
       supabase
         .from("coach_attendance")
-        .insert({ coach_id: coachId, date: seed.TODAY, present: true })
+        .insert({ coach_id: coachId, date: todayISO(), present: true })
         .select("*")
         .single()
         .then(({ data, error }) => {
@@ -493,7 +493,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setCancellationRows((prev) => [
         {
           id: tempRowId,
-          date: seed.TODAY,
+          date: sess?.date ?? todayISO(),
           schoolId: cls?.schoolId ?? "",
           className: cls?.className ?? "—",
           cancelledBy,

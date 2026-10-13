@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { TODAY } from "@/lib/seed";
+import { monthLabel, todayISO } from "@/lib/dates";
 import { CANCEL_REASONS, type CancelledBy } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import {
@@ -159,8 +159,7 @@ export default function CancellationLog() {
         </Table>
       </Card>
       <p className="text-xs text-faint">
-        Cancellations this month ({TODAY.slice(0, 7)}) feed the Admin dashboard
-        card automatically.
+        Cancellations in {monthLabel(todayISO())} are counted on the Admin dashboard.
       </p>
     </div>
   );

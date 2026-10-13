@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { TODAY } from "@/lib/seed";
+import { todayISO } from "@/lib/dates";
 import {
   attendanceRate,
   coachLeaderboard,
@@ -45,7 +45,7 @@ export default function SportsAnalytics() {
 
   const comp = useMemo(() => completionRate(sessions), [sessions]);
   const att = useMemo(
-    () => attendanceRate(attendance, coaches.length, TODAY),
+    () => attendanceRate(attendance, coaches.length, todayISO()),
     [attendance, coaches.length]
   );
   const sports = useMemo(

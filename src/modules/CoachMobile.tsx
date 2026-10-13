@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { TODAY } from "@/lib/seed";
+import { dayLabel, todayISO } from "@/lib/dates";
 import { CANCEL_REASONS } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { PrimaryButton, SportBadge, StatusTag } from "@/components/ui";
@@ -21,14 +21,15 @@ export default function CoachMobile() {
     schoolName,
     toast,
   } = useStore();
+  const today = todayISO();
 
   const present =
-    attendance.find((a) => a.coachId === currentCoachId && a.date === TODAY)
+    attendance.find((a) => a.coachId === currentCoachId && a.date === today)
       ?.present ?? false;
 
   const mySessions = useMemo(
-    () => sessions.filter((s) => s.coachId === currentCoachId && s.date === TODAY),
-    [sessions, currentCoachId]
+    () => sessions.filter((s) => s.coachId === currentCoachId && s.date === today),
+    [today, sessions, currentCoachId]
   );
 
   const [cancelFor, setCancelFor] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function CoachMobile() {
         />
         <div className="relative flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.18em] text-white/70">
           <span>Coach</span>
-          <span>{TODAY}</span>
+          <span>{dayLabel(today)}</span>
         </div>
         <div className="relative mt-2 font-display text-[2rem] font-black uppercase leading-none tracking-[-0.035em]">
           Hi, {firstName}

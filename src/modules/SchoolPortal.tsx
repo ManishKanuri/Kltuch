@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import { monthLabel, todayISO } from "@/lib/dates";
 import { SKILL_LABELS, type SkillKey } from "@/lib/types";
 import { Icon, type IconName } from "@/components/icons";
 import {
@@ -238,7 +239,7 @@ export default function SchoolPortal() {
             </div>
             <div>
               <div className="font-display text-[1.25rem] font-extrabold tracking-[-0.02em] text-content">
-                June 2025 monthly report
+                {monthLabel(todayISO())} monthly report
               </div>
               <div className="text-sm text-muted">{schoolName(schoolId)}</div>
               <p className="mt-2 max-w-lg text-sm text-muted">
