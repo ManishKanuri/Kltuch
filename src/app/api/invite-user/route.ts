@@ -55,6 +55,13 @@ export async function POST(request: Request) {
     { auth: { persistSession: false } }
   );
 
+  // Without redirectTo, Supabase sends the user back to whatever Site URL is
+  // configured in the dashboard — which may not match where this app is
+  // actually running (e.g. localhost in dev). Setting it explicitly here
+  // means the invite link works regardless of that dashboard setting,
+  // as long as this exact URL is also in the project's allowed redirect list.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+
   const { data, error } = await serviceClient.auth.admin.inviteUserByEmail(email, {
     data: {
       role,
@@ -62,6 +69,7 @@ export async function POST(request: Request) {
       school_id: schoolId ?? null,
       full_name: fullName ?? null,
     },
+    redirectTo: `${appUrl}/login`,
   });
 
   if (error) {
