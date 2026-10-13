@@ -16,20 +16,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Set directly from the URL hash on mount — distinct from `error`, which
+  // only ever reflects the result of this page's own form submissions.
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Recovery/invite links put tokens in the URL hash fragment
-    // (#access_token=...&type=recovery), which the browser never sends to a
-    // server — only client JS can read it. The Supabase client is supposed
-    // to detect and consume this automatically on load (detectSessionInUrl),
-    // firing a PASSWORD_RECOVERY auth event — but if this listener subscribes
-    // even slightly after that detection already ran, the event is missed
-    // entirely with no second chance. Checking the hash directly here is a
-    // synchronous, reliable fallback that doesn't depend on listener timing.
+    // Recovery/invite links put tokens (or an error) in the URL hash fragment
+    // (#access_token=...&type=recovery, or #error=...&error_code=otp_expired),
+    // which the browser never sends to a server — only client JS can read it.
+    // The Supabase client is supposed to detect and consume a valid token
+    // automatically on load (detectSessionInUrl), firing a PASSWORD_RECOVERY
+    // auth event — but if this listener subscribes even slightly after that
+    // detection already ran, the event is missed entirely with no second
+    // chance. Checking the hash directly here is a synchronous, reliable
+    // fallback that doesn't depend on listener timing, and lets us surface a
+    // real message for an expired/already-used link instead of silently
+    // falling through to a sign-in form with no password set yet.
     const hash = window.location.hash;
-    if (hash.includes("type=recovery") || hash.includes("type=invite")) {
+    if (hash.includes("error=")) {
+      const params = new URLSearchParams(hash.slice(1));
+      const code = params.get("error_code");
+      setLinkError(
+        code === "otp_expired"
+          ? "That link has expired or was already used. Ask an admin to send you a new one."
+          : params.get("error_description")?.replace(/\+/g, " ") ?? "That link is no longer valid."
+      );
+    } else if (hash.includes("type=recovery") || hash.includes("type=invite")) {
       setMode("set-password");
     }
 
@@ -79,6 +93,12 @@ export default function LoginPage() {
             <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Internal ERP</div>
           </div>
         </div>
+
+        {linkError && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
+            {linkError}
+          </div>
+        )}
 
         {mode === "signin" ? (
           <form onSubmit={handleSignIn} className="space-y-4">
