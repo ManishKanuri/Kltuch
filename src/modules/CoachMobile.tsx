@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { dayLabel, todayISO } from "@/lib/dates";
+import { bySchedule, dayLabel, timeLabel, todayISO } from "@/lib/dates";
 import { CANCEL_REASONS } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { PrimaryButton, SportBadge, StatusTag } from "@/components/ui";
@@ -28,7 +28,7 @@ export default function CoachMobile() {
       ?.present ?? false;
 
   const mySessions = useMemo(
-    () => sessions.filter((s) => s.coachId === currentCoachId && s.date === today),
+    () => sessions.filter((s) => s.coachId === currentCoachId && s.date === today).sort(bySchedule),
     [today, sessions, currentCoachId]
   );
 
@@ -86,6 +86,7 @@ export default function CoachMobile() {
                       {cls && <SportBadge sport={cls.sport} showLabel={false} />}
                     </div>
                     <div className="mt-0.5 flex gap-3 text-[12.5px] text-faint">
+                      {s.startTime && <span className="font-mono font-semibold text-content">{timeLabel(s.startTime)}</span>}
                       <span>{cls ? schoolName(cls.schoolId) : ""}</span>
                       <span className="font-mono">Wk {s.curriculumWeek}</span>
                     </div>

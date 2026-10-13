@@ -7,6 +7,7 @@ import type {
   Assessment,
   Cancellation,
   CancellationRow,
+  ClassSlot,
   Coach,
   CoachAttendance,
   ClassRoom,
@@ -29,6 +30,7 @@ type CancellationRowsViewRow = Database["public"]["Views"]["cancellation_rows"][
 type EquipmentRow = Database["public"]["Tables"]["equipment"]["Row"];
 type CoachAttendanceRow = Database["public"]["Tables"]["coach_attendance"]["Row"];
 type CurriculumRow = Database["public"]["Tables"]["curriculum"]["Row"];
+type ClassSlotRow = Database["public"]["Tables"]["class_schedule"]["Row"];
 
 export function mapSchool(row: SchoolRow): School {
   return {
@@ -77,9 +79,20 @@ export function mapSession(row: SessionRow): Session {
     id: row.id,
     classId: row.class_id,
     date: row.date,
+    // Postgres returns "HH:MM:SS"; the app works in "HH:MM".
+    startTime: row.start_time ? row.start_time.slice(0, 5) : null,
     status: row.status,
     curriculumWeek: row.curriculum_week,
     coachId: row.coach_id,
+  };
+}
+
+export function mapClassSlot(row: ClassSlotRow): ClassSlot {
+  return {
+    id: row.id,
+    classId: row.class_id,
+    weekday: row.weekday,
+    startTime: row.start_time.slice(0, 5),
   };
 }
 

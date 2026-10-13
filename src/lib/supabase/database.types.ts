@@ -115,6 +115,38 @@ export type Database = {
           },
         ]
       }
+      class_schedule: {
+        Row: {
+          class_id: string
+          created_at: string
+          id: string
+          start_time: string
+          weekday: number
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          id?: string
+          start_time: string
+          weekday: number
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          id?: string
+          start_time?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           class_name: string
@@ -478,6 +510,7 @@ export type Database = {
           curriculum_week: number
           date: string
           id: string
+          start_time: string | null
           status: Database["public"]["Enums"]["session_status"]
           updated_at: string
         }
@@ -488,6 +521,7 @@ export type Database = {
           curriculum_week?: number
           date: string
           id?: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["session_status"]
           updated_at?: string
         }
@@ -498,6 +532,7 @@ export type Database = {
           curriculum_week?: number
           date?: string
           id?: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["session_status"]
           updated_at?: string
         }

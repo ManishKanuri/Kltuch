@@ -82,14 +82,14 @@ export const classes: ClassRoom[] = [
 ];
 
 export const sessions: Session[] = [
-  { id: "se_1", classId: "cl_abc_5a", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_ravi" },
-  { id: "se_2", classId: "cl_abc_5b", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_ravi" },
-  { id: "se_3", classId: "cl_xyz_6a", date: "2025-06-02", status: "Cancelled", curriculumWeek: 3, coachId: "co_priya" },
-  { id: "se_4", classId: "cl_xyz_7a", date: "2025-06-02", status: "Pending", curriculumWeek: 3, coachId: "co_priya" },
-  { id: "se_5", classId: "cl_mno_7b", date: "2025-06-02", status: "Pending", curriculumWeek: 5, coachId: "co_arjun" },
-  { id: "se_6", classId: "cl_abc_4a", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_meena" },
-  { id: "se_7", classId: "cl_abc_7a", date: "2025-06-02", status: "Pending", curriculumWeek: 4, coachId: "co_meena" },
-  { id: "se_8", classId: "cl_abc_3a", date: "2025-06-01", status: "Done", curriculumWeek: 4, coachId: "co_ravi" },
+  { id: "se_1", classId: "cl_abc_5a", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_ravi", startTime: null },
+  { id: "se_2", classId: "cl_abc_5b", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_ravi", startTime: null },
+  { id: "se_3", classId: "cl_xyz_6a", date: "2025-06-02", status: "Cancelled", curriculumWeek: 3, coachId: "co_priya", startTime: null },
+  { id: "se_4", classId: "cl_xyz_7a", date: "2025-06-02", status: "Pending", curriculumWeek: 3, coachId: "co_priya", startTime: null },
+  { id: "se_5", classId: "cl_mno_7b", date: "2025-06-02", status: "Pending", curriculumWeek: 5, coachId: "co_arjun", startTime: null },
+  { id: "se_6", classId: "cl_abc_4a", date: "2025-06-02", status: "Done", curriculumWeek: 4, coachId: "co_meena", startTime: null },
+  { id: "se_7", classId: "cl_abc_7a", date: "2025-06-02", status: "Pending", curriculumWeek: 4, coachId: "co_meena", startTime: null },
+  { id: "se_8", classId: "cl_abc_3a", date: "2025-06-01", status: "Done", curriculumWeek: 4, coachId: "co_ravi", startTime: null },
 ];
 
 export const cancellations: Cancellation[] = [

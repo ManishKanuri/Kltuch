@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { monthLabel, todayISO } from "@/lib/dates";
+import { bySchedule, monthLabel, timeLabel, todayISO } from "@/lib/dates";
 import { SKILL_LABELS, type SkillKey } from "@/lib/types";
 import { Icon, type IconName } from "@/components/icons";
 import {
@@ -52,16 +52,18 @@ export default function SchoolPortal() {
     () => classes.filter((c) => c.schoolId === schoolId).map((c) => c.id),
     [classes, schoolId]
   );
-  const schoolSessions = sessions.filter((s) =>
-    schoolClassIds.includes(s.classId)
-  );
+  const schoolSessions = sessions
+    .filter((s) => schoolClassIds.includes(s.classId))
+    .sort(bySchedule);
+  // "Done" counts measure delivery so far, so leave out sessions that aren't due yet.
+  const sessionsToDate = schoolSessions.filter((s) => s.date <= todayISO());
   const schoolCurriculum = curriculum.filter((c) =>
     schoolClassIds.includes(c.classId)
   );
   const schoolAssessments = assessments.filter((a) =>
     schoolClassIds.includes(a.classId)
   );
-  const doneCount = schoolSessions.filter((s) => s.status === "Done").length;
+  const doneCount = sessionsToDate.filter((s) => s.status === "Done").length;
 
   return (
     <div className="space-y-4">
@@ -92,7 +94,7 @@ export default function SchoolPortal() {
           label="Sessions done"
           icon="check-circle"
           tone="tennis"
-          value={`${doneCount}/${schoolSessions.length}`}
+          value={`${doneCount}/${sessionsToDate.length}`}
         />
         <StatCard
           label="Students assessed"
@@ -142,6 +144,7 @@ export default function SchoolPortal() {
               <Th>Class</Th>
               <Th>Sport</Th>
               <Th>Date</Th>
+              <Th>Time</Th>
               <Th>Coach</Th>
               <Th>Week</Th>
               <Th>Status</Th>
@@ -156,6 +159,7 @@ export default function SchoolPortal() {
                     </Td>
                     <Td>{cls && <SportBadge sport={cls.sport} />}</Td>
                     <Td className="font-mono text-[13px]">{s.date}</Td>
+                    <Td className="font-mono text-[13px]">{timeLabel(s.startTime) || "—"}</Td>
                     <Td>{coachName(s.coachId)}</Td>
                     <Td className="font-mono text-[13px]">Wk {s.curriculumWeek}</Td>
                     <Td>
@@ -165,7 +169,7 @@ export default function SchoolPortal() {
                 );
               })}
               {schoolSessions.length === 0 && (
-                <Empty cols={6}>No sessions for this school.</Empty>
+                <Empty cols={7}>No sessions for this school.</Empty>
               )}
             </tbody>
           </Table>
@@ -251,7 +255,7 @@ export default function SchoolPortal() {
           <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
             <MiniStat
               label="Sessions done"
-              value={`${doneCount}/${schoolSessions.length}`}
+              value={`${doneCount}/${sessionsToDate.length}`}
             />
             <MiniStat label="Classes" value={schoolClassIds.length} />
             <MiniStat label="Students" value={schoolAssessments.length} />

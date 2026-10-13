@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { SPORTS, type SessionStatus, type Sport } from "@/lib/types";
+import { addDays, bySchedule, isoWeekday, timeLabel, todayISO } from "@/lib/dates";
 import { Icon } from "@/components/icons";
 import {
   Card,
@@ -18,6 +19,8 @@ import {
 } from "@/components/ui";
 
 const STATUSES: (SessionStatus | "All")[] = ["All", "Done", "Pending", "Cancelled"];
+const RANGES = { today: "Today", week: "This week", upcoming: "Upcoming", all: "All dates" } as const;
+type Range = keyof typeof RANGES;
 
 export default function SessionTracker() {
   const {
@@ -33,9 +36,19 @@ export default function SessionTracker() {
   const [schoolFilter, setSchoolFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState<SessionStatus | "All">("All");
   const [sportFilter, setSportFilter] = useState<Sport | "All">("All");
+  const [range, setRange] = useState<Range>("week");
+  const today = todayISO();
 
   const rows = useMemo(() => {
-    return sessions
+    const weekStart = addDays(today, 1 - isoWeekday(today));
+    const inRange = (date: string) =>
+      range === "today" ? date === today
+        : range === "week" ? date >= weekStart && date <= addDays(weekStart, 6)
+          : range === "upcoming" ? date >= today
+            : true;
+    return [...sessions]
+      .filter((s) => inRange(s.date))
+      .sort(bySchedule)
       .map((s) => ({ s, cls: classById(s.classId) }))
       .filter(({ cls }) =>
         schoolFilter === "All" ? true : cls?.schoolId === schoolFilter
@@ -46,13 +59,26 @@ export default function SessionTracker() {
       .filter(({ cls }) =>
         sportFilter === "All" ? true : cls?.sport === sportFilter
       );
-  }, [sessions, schoolFilter, statusFilter, sportFilter, classById]);
+  }, [sessions, range, today, schoolFilter, statusFilter, sportFilter, classById]);
 
   return (
     <div className="space-y-4">
       <SectionTitle icon="session">Session tracker</SectionTitle>
 
       <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value as Range)}
+          aria-label="Filter by date"
+          className="k-field w-auto"
+        >
+          {Object.entries(RANGES).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+
         <select
           value={schoolFilter}
           onChange={(e) => setSchoolFilter(e.target.value)}
@@ -106,6 +132,7 @@ export default function SessionTracker() {
             <Th>Class</Th>
             <Th>Sport</Th>
             <Th>Date</Th>
+            <Th>Time</Th>
             <Th>Coach</Th>
             <Th>Week</Th>
             <Th>Status</Th>
@@ -120,6 +147,7 @@ export default function SessionTracker() {
                 <Td>{cls?.className}</Td>
                 <Td>{cls && <SportBadge sport={cls.sport} />}</Td>
                 <Td className="font-mono text-[13px]">{s.date}</Td>
+                <Td className="font-mono text-[13px]">{timeLabel(s.startTime) || "—"}</Td>
                 <Td>{coachName(s.coachId)}</Td>
                 <Td className="font-mono text-[13px]">Wk {s.curriculumWeek}</Td>
                 <Td>
@@ -132,7 +160,7 @@ export default function SessionTracker() {
                       setSessionStatus(s.id, e.target.value as SessionStatus);
                       toast(`${cls?.className} marked ${e.target.value}`);
                     }}
-                    aria-label={`Update status for ${cls?.className}`}
+                    aria-label={`Update status for ${cls?.className} on ${s.date}`}
                     className="rounded-sm border border-line bg-surface px-2 py-1 text-xs text-content"
                   >
                     <option>Done</option>
@@ -143,7 +171,7 @@ export default function SessionTracker() {
               </Tr>
             ))}
             {rows.length === 0 && (
-              <Empty cols={8}>
+              <Empty cols={9}>
                 <span className="inline-flex items-center gap-2">
                   <Icon name="filter" size={15} /> No sessions match these
                   filters.

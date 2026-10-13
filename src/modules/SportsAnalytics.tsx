@@ -41,12 +41,15 @@ const STATUS_META = [
 ] as const;
 
 export default function SportsAnalytics() {
-  const { sessions, classes, coaches, assessments, attendance } = useStore();
+  const { sessions: allSessions, classes, coaches, assessments, attendance } = useStore();
+  const today = todayISO();
+  // Everything here measures delivery so far; future timetable sessions aren't due yet.
+  const sessions = useMemo(() => allSessions.filter((s) => s.date <= today), [allSessions, today]);
 
   const comp = useMemo(() => completionRate(sessions), [sessions]);
   const att = useMemo(
-    () => attendanceRate(attendance, coaches.length, todayISO()),
-    [attendance, coaches.length]
+    () => attendanceRate(attendance, coaches.length, today),
+    [attendance, coaches.length, today]
   );
   const sports = useMemo(
     () => sportBreakdown(classes, sessions),

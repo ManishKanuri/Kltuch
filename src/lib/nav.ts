@@ -7,6 +7,7 @@ export type ModuleKey =
   | "fitness-analytics"
   | "coach-management"
   | "coach-attendance"
+  | "timetable"
   | "session-tracker"
   | "cancellation-log"
   | "curriculum-tracker"
@@ -46,6 +47,7 @@ export const ADMIN_NAV: NavSection[] = [
   {
     label: "Sessions",
     items: [
+      { key: "timetable", label: "Timetable", icon: "calendar" },
       { key: "session-tracker", label: "Session Tracker", icon: "session" },
       { key: "cancellation-log", label: "Cancellation Log", icon: "cancel" },
       { key: "curriculum-tracker", label: "Curriculum Tracker", icon: "curriculum" },
@@ -79,6 +81,7 @@ export const PAGE_TITLES: Record<ModuleKey, string> = {
   "fitness-analytics": "CISCE Fitness Analytics",
   "coach-management": "Coach Management",
   "coach-attendance": "Coach Attendance",
+  timetable: "Timetable",
   "session-tracker": "Session Tracker",
   "cancellation-log": "Cancellation Log",
   "curriculum-tracker": "Curriculum Tracker",

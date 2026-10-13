@@ -51,9 +51,18 @@ export interface Session {
   id: string;
   classId: string;
   date: string; // ISO date
+  startTime: string | null; // "HH:MM", IST wall-clock; null for sessions created before scheduling
   status: SessionStatus;
   curriculumWeek: number;
   coachId: string;
+}
+
+// One weekly timetable slot for a class, e.g. Class 5A on Mondays at 09:15.
+export interface ClassSlot {
+  id: string;
+  classId: string;
+  weekday: number; // ISO weekday: 1 = Monday ... 7 = Sunday
+  startTime: string; // "HH:MM"
 }
 
 export type CancelledBy = "School" | "KLUTCH";

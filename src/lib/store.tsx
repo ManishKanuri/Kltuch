@@ -15,6 +15,7 @@ import type {
   CancellationRow,
   CancelledBy,
   ClassRoom,
+  ClassSlot,
   Coach,
   CoachAttendance,
   CurriculumWeek,
@@ -27,7 +28,7 @@ import type {
   SkillKey,
 } from "./types";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { todayISO } from "./dates";
+import { addDays, isoWeekday, todayISO } from "./dates";
 import type { ModuleKey } from "./nav";
 import { createClient } from "./supabase/client";
 import type { Database } from "./supabase/database.types";
@@ -36,6 +37,7 @@ import {
   mapCancellation,
   mapCancellationRow,
   mapClass,
+  mapClassSlot,
   mapCoach,
   mapCoachAttendance,
   mapCurriculum,
@@ -125,6 +127,13 @@ interface StoreShape {
   addCoach: (c: Omit<Coach, "id">) => void;
   setCoachRating: (id: string, rating: number) => void;
 
+  // timetable + scheduling
+  schedule: ClassSlot[];
+  addSlot: (classId: string, weekday: number, startTime: string) => Promise<boolean>;
+  removeSlot: (id: string) => void;
+  createSessions: (from: string, to: string) => Promise<{ created: number; skipped: number } | null>;
+  addSession: (classId: string, date: string, startTime: string | null) => Promise<boolean>;
+
   // helpers
   schoolName: (id: string) => string;
   coachName: (id: string) => string;
@@ -179,6 +188,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [attendance, setAttendance] = useState<CoachAttendance[]>([]);
   const [curriculum, setCurriculum] = useState<CurriculumWeek[]>([]);
+  const [schedule, setSchedule] = useState<ClassSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
 
@@ -258,6 +268,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         equipmentRes,
         attendanceRes,
         curriculumRes,
+        scheduleRes,
       ] = await Promise.all([
         supabase.from("schools").select("*"),
         supabase.from("coaches").select("*"),
@@ -270,6 +281,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         supabase.from("equipment").select("*"),
         supabase.from("coach_attendance").select("*"),
         supabase.from("curriculum").select("*"),
+        supabase.from("class_schedule").select("*"),
       ]);
 
       if (cancelled) return;
@@ -285,6 +297,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (equipmentRes.error) throw equipmentRes.error;
       if (attendanceRes.error) throw attendanceRes.error;
       if (curriculumRes.error) throw curriculumRes.error;
+      if (scheduleRes.error) throw scheduleRes.error;
 
       const mappedSchools = schoolsRes.data.map(mapSchool);
       setSchools(mappedSchools);
@@ -298,6 +311,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setEquipment(equipmentRes.data.map(mapEquipment));
       setAttendance(attendanceRes.data.map(mapCoachAttendance));
       setCurriculum(curriculumRes.data.map(mapCurriculum));
+      setSchedule(scheduleRes.data.map(mapClassSlot));
       setCurrentSchoolId((prev) => prev || mappedSchools[0]?.id || "");
       setLoading(false);
     }
@@ -516,6 +530,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           setCancellations((prev) => swapTemp(prev, tempId, mapCancellation(data)));
+          if (rescheduledDate && sess) {
+            supabase
+              .from("sessions")
+              .upsert(
+                {
+                  class_id: sess.classId,
+                  coach_id: sess.coachId,
+                  date: rescheduledDate,
+                  start_time: sess.startTime,
+                  status: "Pending",
+                  curriculum_week: sess.curriculumWeek,
+                },
+                { onConflict: "class_id,date,start_time", ignoreDuplicates: true }
+              )
+              .select("*")
+              .then(({ data: made, error: makeupError }) => {
+                if (makeupError) {
+                  toast("Cancellation logged, but the makeup session couldn't be added. Add it from the Timetable.");
+                  return;
+                }
+                if (made?.length) {
+                  setSessions((prev) => made.reduce((list, row) => upsertById(list, mapSession(row)), prev));
+                  toast(`Makeup session added for ${rescheduledDate}`);
+                }
+              });
+          }
           // Refresh the denormalized view row with its real id, keeping the
           // optimistic date/school/class fields (the view join is identical).
           supabase
@@ -530,7 +570,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             });
         });
     },
-    [sessions, classes, supabase]
+    [sessions, classes, supabase, toast]
   );
 
   const addAssessment = useCallback(
@@ -667,6 +707,106 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [supabase]
   );
 
+  const addSlot = useCallback(
+    async (classId: string, weekday: number, startTime: string) => {
+      const { data, error } = await supabase
+        .from("class_schedule")
+        .insert({ class_id: classId, weekday, start_time: startTime })
+        .select("*")
+        .single();
+      if (error) {
+        toast(error.code === "23505" ? "That class already has a slot at that time." : "Couldn't save the slot. Try again.");
+        return false;
+      }
+      setSchedule((prev) => upsertById(prev, mapClassSlot(data)));
+      return true;
+    },
+    [supabase, toast]
+  );
+
+  const removeSlot = useCallback(
+    (id: string) => {
+      const removed = schedule.find((slot) => slot.id === id);
+      setSchedule((prev) => prev.filter((slot) => slot.id !== id));
+      supabase
+        .from("class_schedule")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error && removed) {
+            setSchedule((prev) => upsertById(prev, removed));
+            toast("Couldn't remove the slot. Try again.");
+          }
+        });
+    },
+    [schedule, supabase, toast]
+  );
+
+  // A Pending session for every timetable slot between two dates. Sessions that
+  // already exist are skipped (unique class/date/time), so rerunning is safe.
+  const createSessions = useCallback(
+    async (from: string, to: string) => {
+      const rows: Tables["sessions"]["Insert"][] = [];
+      for (let date = from; date <= to; date = addDays(date, 1)) {
+        const weekday = isoWeekday(date);
+        for (const slot of schedule) {
+          if (slot.weekday !== weekday) continue;
+          const cls = classes.find((c) => c.id === slot.classId);
+          if (!cls) continue;
+          rows.push({
+            class_id: cls.id,
+            coach_id: cls.coachId,
+            date,
+            start_time: slot.startTime,
+            status: "Pending",
+            curriculum_week: curriculum.find((c) => c.classId === cls.id)?.currentWeek ?? 1,
+          });
+        }
+      }
+      let created = 0;
+      for (let i = 0; i < rows.length; i += 500) {
+        const { data, error } = await supabase
+          .from("sessions")
+          .upsert(rows.slice(i, i + 500), { onConflict: "class_id,date,start_time", ignoreDuplicates: true })
+          .select("*");
+        if (error) {
+          toast("Couldn't create the sessions. Try again.");
+          return null;
+        }
+        created += data.length;
+        setSessions((prev) => data.reduce((list, row) => upsertById(list, mapSession(row)), prev));
+      }
+      return { created, skipped: rows.length - created };
+    },
+    [schedule, classes, curriculum, supabase, toast]
+  );
+
+  const addSession = useCallback(
+    async (classId: string, date: string, startTime: string | null) => {
+      const cls = classes.find((c) => c.id === classId);
+      if (!cls) return false;
+      const { data, error } = await supabase
+        .from("sessions")
+        .insert({
+          class_id: cls.id,
+          coach_id: cls.coachId,
+          date,
+          start_time: startTime,
+          status: "Pending",
+          curriculum_week: curriculum.find((c) => c.classId === cls.id)?.currentWeek ?? 1,
+        })
+        .select("*")
+        .single();
+      if (error) {
+        toast(error.code === "23505" ? "That class already has a session at that date and time." : "Couldn't add the session. Try again.");
+        return false;
+      }
+      setSessions((prev) => upsertById(prev, mapSession(data)));
+      return true;
+    },
+    [classes, curriculum, supabase, toast]
+  );
+
   const value = useMemo<StoreShape>(
     () => ({
       role,
@@ -704,6 +844,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateEquipmentStatus,
       addCoach,
       setCoachRating,
+      schedule,
+      addSlot,
+      removeSlot,
+      createSessions,
+      addSession,
       schoolName,
       coachName,
       classById,
@@ -744,6 +889,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateEquipmentStatus,
       addCoach,
       setCoachRating,
+      schedule,
+      addSlot,
+      removeSlot,
+      createSessions,
+      addSession,
       schoolName,
       coachName,
       classById,

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { monthLabel, todayISO } from "@/lib/dates";
+import { bySchedule, monthLabel, timeLabel, todayISO } from "@/lib/dates";
 import { sportBreakdown } from "@/lib/stats";
 import { SPORT_COLOR, SPORT_ICON } from "@/lib/types";
 import { Icon } from "@/components/icons";
@@ -66,9 +66,10 @@ export default function Dashboard() {
     };
   }, [today, sessions, coaches, attendance, assessments, classes, cancellationRows, fitnessAssessments]);
 
+  // Completion counts sessions up to today; future ones from the timetable aren't due yet.
   const sports = useMemo(
-    () => sportBreakdown(classes, sessions),
-    [classes, sessions]
+    () => sportBreakdown(classes, sessions.filter((s) => s.date <= today)),
+    [classes, sessions, today]
   );
   const fitnessEngagement = useMemo(() => {
     const scheduled = fitnessAssessments.reduce((sum, record) => sum + record.sessionsScheduled, 0);
@@ -79,23 +80,14 @@ export default function Dashboard() {
   }, [fitnessAssessments]);
 
   const activity = useMemo(() => {
-    const times = [
-      "09:15 AM",
-      "09:30 AM",
-      "10:00 AM",
-      "10:30 AM",
-      "11:00 AM",
-      "11:30 AM",
-      "12:00 PM",
-      "12:30 PM",
-    ];
     return sessions
       .filter((s) => s.date === today)
-      .map((s, i) => {
+      .sort(bySchedule)
+      .map((s) => {
         const cls = classById(s.classId);
         return {
           key: s.id,
-          time: times[i % times.length],
+          time: timeLabel(s.startTime) || "—",
           coach: coachName(s.coachId),
           school: cls ? schoolName(cls.schoolId) : "—",
           sport: cls?.sport,

@@ -21,6 +21,7 @@ import FitnessAnalytics from "@/modules/FitnessAnalytics";
 import CoachManagement from "@/modules/CoachManagement";
 import CoachAttendance from "@/modules/CoachAttendance";
 import SessionTracker from "@/modules/SessionTracker";
+import Timetable from "@/modules/Timetable";
 import CancellationLog from "@/modules/CancellationLog";
 import CurriculumTracker from "@/modules/CurriculumTracker";
 import StudentAssessment from "@/modules/StudentAssessment";
@@ -41,6 +42,8 @@ function ModuleView({ m }: { m: ModuleKey }) {
       return <CoachManagement />;
     case "coach-attendance":
       return <CoachAttendance />;
+    case "timetable":
+      return <Timetable />;
     case "session-tracker":
       return <SessionTracker />;
     case "cancellation-log":
@@ -231,7 +234,12 @@ function TopBar({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {onSwitchRole && <RoleSwitcher role={role} onSwitchRole={onSwitchRole} />}
+        {/* Phone headers have no room for it; the sidebar still links to the coach and school screens. */}
+        {onSwitchRole && (
+          <div className="hidden sm:block">
+            <RoleSwitcher role={role} onSwitchRole={onSwitchRole} />
+          </div>
+        )}
         <ThemeToggle />
         <div className="hidden items-center gap-2 sm:flex">
           <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-klutch-field text-[11px] font-semibold text-white">
