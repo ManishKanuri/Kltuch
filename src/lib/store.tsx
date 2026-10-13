@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -26,10 +27,20 @@ import type {
   SkillKey,
 } from "./types";
 import * as seed from "./seed";
-import { fitnessAssessments as seededFitnessAssessments } from "./fitnessSeed";
 import type { ModuleKey } from "./nav";
+import { createClient } from "./supabase/client";
+import {
+  mapAssessment,
+  mapClass,
+  mapCoach,
+  mapFitnessAssessment,
+  mapSchool,
+} from "./supabase/mappers";
 
-// ---- lightweight id generator (deterministic-ish, no Date.now needed) ----
+// ---- lightweight id generator for the tables still on mock data ----
+// (sessions, cancellations, equipment, attendance, curriculum — out of pilot
+// scope; see docs/PRODUCTION_BLUEPRINT.md §9. Live on Supabase: schools,
+// coaches, classes, assessments, fitness_assessments.)
 let _idc = 1000;
 const nid = (p: string) => `${p}_${++_idc}`;
 
@@ -60,6 +71,7 @@ interface StoreShape {
   attendance: CoachAttendance[];
   curriculum: CurriculumWeek[];
   fitnessAssessments: FitnessAssessment[];
+  loading: boolean;
 
   // actions
   toggleAttendance: (coachId: string) => void;
@@ -97,11 +109,21 @@ interface StoreShape {
 const Ctx = createContext<StoreShape | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const supabase = useMemo(() => createClient(), []);
+
   const [role, setRole] = useState<Role>("admin");
   const [active, setActive] = useState<ModuleKey>("dashboard");
-  const [currentSchoolId, setCurrentSchoolId] = useState<string>("sch_abc");
+  const [currentSchoolId, setCurrentSchoolId] = useState<string>("");
 
-  const [coaches, setCoaches] = useState<Coach[]>(seed.coaches);
+  // ---- Supabase-backed state (pilot scope) ----
+  const [schools, setSchools] = useState<School[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [classes, setClasses] = useState<ClassRoom[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [fitnessAssessments, setFitnessAssessments] = useState<FitnessAssessment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ---- still mock data: out of pilot scope (no table yet) ----
   const [sessions, setSessions] = useState<Session[]>(seed.sessions);
   const [cancellations, setCancellations] = useState<Cancellation[]>(
     seed.cancellations
@@ -109,7 +131,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [cancellationRows, setCancellationRows] = useState(
     seed.cancellationRows.map((r) => ({ ...r }))
   );
-  const [assessments, setAssessments] = useState<Assessment[]>(seed.assessments);
   const [equipment, setEquipment] = useState<Equipment[]>(seed.equipment);
   const [attendance, setAttendance] = useState<CoachAttendance[]>(
     seed.coachAttendance
@@ -135,17 +156,67 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // ---- initial load from Supabase ----
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      const [
+        schoolsRes,
+        coachesRes,
+        classesRes,
+        assessmentsRes,
+        fitnessRes,
+      ] = await Promise.all([
+        supabase.from("schools").select("*"),
+        supabase.from("coaches").select("*"),
+        supabase.from("classes").select("*"),
+        supabase.from("assessments").select("*"),
+        supabase.from("fitness_assessments").select("*"),
+      ]);
+
+      if (cancelled) return;
+
+      if (schoolsRes.error) throw schoolsRes.error;
+      if (coachesRes.error) throw coachesRes.error;
+      if (classesRes.error) throw classesRes.error;
+      if (assessmentsRes.error) throw assessmentsRes.error;
+      if (fitnessRes.error) throw fitnessRes.error;
+
+      const mappedSchools = schoolsRes.data.map(mapSchool);
+      setSchools(mappedSchools);
+      setCoaches(coachesRes.data.map(mapCoach));
+      setClasses(classesRes.data.map(mapClass));
+      setAssessments(assessmentsRes.data.map(mapAssessment));
+      setFitnessAssessments(fitnessRes.data.map(mapFitnessAssessment));
+      setCurrentSchoolId((prev) => prev || mappedSchools[0]?.id || "");
+      setLoading(false);
+    }
+
+    load().catch((err) => {
+      if (!cancelled) {
+        console.error("Failed to load data from Supabase:", err);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
   const schoolName = useCallback(
-    (id: string) => seed.schools.find((s) => s.id === id)?.name ?? "—",
-    []
+    (id: string) => schools.find((s) => s.id === id)?.name ?? "—",
+    [schools]
   );
   const coachName = useCallback(
     (id: string) => coaches.find((c) => c.id === id)?.name ?? "—",
     [coaches]
   );
   const classById = useCallback(
-    (id: string) => seed.classes.find((c) => c.id === id),
-    []
+    (id: string) => classes.find((c) => c.id === id),
+    [classes]
   );
   const classLabel = useCallback(
     (id: string) => classById(id)?.className ?? "—",
@@ -206,7 +277,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         { id: nid("ca"), sessionId, cancelledBy, reason, rescheduledDate },
       ]);
       const sess = sessions.find((s) => s.id === sessionId);
-      const cls = sess ? seed.classes.find((c) => c.id === sess.classId) : undefined;
+      const cls = sess ? classes.find((c) => c.id === sess.classId) : undefined;
       setCancellationRows((prev) => [
         {
           id: nid("car"),
@@ -220,20 +291,52 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
     },
-    [sessions]
+    [sessions, classes]
   );
 
-  const addAssessment = useCallback((a: Omit<Assessment, "id">) => {
-    setAssessments((prev) => [...prev, { ...a, id: nid("as") }]);
-  }, []);
+  const addAssessment = useCallback(
+    (a: Omit<Assessment, "id">) => {
+      const tempId = nid("as");
+      setAssessments((prev) => [...prev, { ...a, id: tempId }]);
+      supabase
+        .from("assessments")
+        .insert({
+          student_name: a.studentName,
+          class_id: a.classId,
+          term: a.term,
+          ratings: a.ratings,
+          date: a.date,
+        })
+        .select("*")
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Failed to save assessment:", error);
+            setAssessments((prev) => prev.filter((x) => x.id !== tempId));
+            return;
+          }
+          setAssessments((prev) =>
+            prev.map((x) => (x.id === tempId ? mapAssessment(data) : x))
+          );
+        });
+    },
+    [supabase]
+  );
 
   const updateAssessment = useCallback(
     (id: string, ratings: Record<SkillKey, number>) => {
       setAssessments((prev) =>
         prev.map((a) => (a.id === id ? { ...a, ratings } : a))
       );
+      supabase
+        .from("assessments")
+        .update({ ratings })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to update assessment:", error);
+        });
     },
-    []
+    [supabase]
   );
 
   const addEquipment = useCallback((e: Omit<Equipment, "id">) => {
@@ -253,15 +356,50 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const addCoach = useCallback((c: Omit<Coach, "id">) => {
-    setCoaches((prev) => [...prev, { ...c, id: nid("co") }]);
-  }, []);
+  const addCoach = useCallback(
+    (c: Omit<Coach, "id">) => {
+      const tempId = nid("co");
+      setCoaches((prev) => [...prev, { ...c, id: tempId }]);
+      supabase
+        .from("coaches")
+        .insert({
+          name: c.name,
+          phone: c.phone,
+          assigned_school_id: c.assignedSchoolId,
+          status: c.status,
+          rating: c.rating,
+        })
+        .select("*")
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Failed to save coach:", error);
+            setCoaches((prev) => prev.filter((x) => x.id !== tempId));
+            return;
+          }
+          setCoaches((prev) =>
+            prev.map((x) => (x.id === tempId ? mapCoach(data) : x))
+          );
+        });
+    },
+    [supabase]
+  );
 
-  const setCoachRating = useCallback((id: string, rating: number) => {
-    setCoaches((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, rating } : c))
-    );
-  }, []);
+  const setCoachRating = useCallback(
+    (id: string, rating: number) => {
+      setCoaches((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, rating } : c))
+      );
+      supabase
+        .from("coaches")
+        .update({ rating })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to update coach rating:", error);
+        });
+    },
+    [supabase]
+  );
 
   const value = useMemo<StoreShape>(
     () => ({
@@ -272,9 +410,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       currentCoachId: seed.CURRENT_COACH_ID,
       currentSchoolId,
       setCurrentSchoolId,
-      schools: seed.schools,
+      schools,
       coaches,
-      classes: seed.classes,
+      classes,
       sessions,
       cancellations,
       cancellationRows,
@@ -282,7 +420,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       equipment,
       attendance,
       curriculum,
-      fitnessAssessments: seededFitnessAssessments,
+      fitnessAssessments,
+      loading,
       toggleAttendance,
       setSessionStatus,
       setCurriculumWeek,
@@ -305,7 +444,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       role,
       active,
       currentSchoolId,
+      schools,
       coaches,
+      classes,
       sessions,
       cancellations,
       cancellationRows,
@@ -313,6 +454,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       equipment,
       attendance,
       curriculum,
+      fitnessAssessments,
+      loading,
       toggleAttendance,
       setSessionStatus,
       setCurriculumWeek,
