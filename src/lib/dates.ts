@@ -67,3 +67,23 @@ export function timeLabel(hhmm: string | null): string {
 export function bySchedule<T extends { date: string; startTime: string | null }>(a: T, b: T): number {
   return a.date.localeCompare(b.date) || (a.startTime ?? "99:99").localeCompare(b.startTime ?? "99:99");
 }
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-11-02" -> "Mon 2 Nov". */
+export function shortDay(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${WEEKDAYS[isoWeekday(iso) - 1]} ${d} ${MONTHS_SHORT[m - 1]}`;
+}
+
+/** "2026-11-02", "2026-11-07" -> "2–7 Nov"; across months, "30 Nov–5 Dec". */
+export function rangeLabel(from: string, to: string): string {
+  const [, fm, fd] = from.split("-").map(Number);
+  const [, tm, td] = to.split("-").map(Number);
+  return fm === tm ? `${fd}–${td} ${MONTHS_SHORT[tm - 1]}` : `${fd} ${MONTHS_SHORT[fm - 1]}–${td} ${MONTHS_SHORT[tm - 1]}`;
+}
+
+/** The Monday of the week a date falls in. */
+export function mondayOf(iso: string): string {
+  return addDays(iso, 1 - isoWeekday(iso));
+}

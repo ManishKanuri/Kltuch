@@ -1,36 +1,18 @@
-// Maps snake_case Supabase rows <-> the camelCase app types in src/lib/types.ts.
-// Keeping this mapping in one place is what let Phase 3 swap store.tsx's
-// internals without touching any UI component — components only ever see
-// the App* shapes below, never raw DB rows.
+// Maps snake_case Supabase rows to the camelCase app types in src/lib/types.ts.
+// Components only ever see the app shapes, never raw database rows.
 
-import type {
-  Assessment,
-  Cancellation,
-  CancellationRow,
-  ClassSlot,
-  Coach,
-  CoachAttendance,
-  ClassRoom,
-  CurriculumWeek,
-  Equipment,
-  FitnessAssessment,
-  School,
-  Session,
-} from "../types";
+import type { Coach, CoachAttendance, School, Session, Sport, TimetableSlot } from "../types";
 import type { Database } from "./database.types";
 
-type SchoolRow = Database["public"]["Tables"]["schools"]["Row"];
-type CoachRow = Database["public"]["Tables"]["coaches"]["Row"];
-type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
-type AssessmentRow = Database["public"]["Tables"]["assessments"]["Row"];
-type FitnessAssessmentRow = Database["public"]["Tables"]["fitness_assessments"]["Row"];
-type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
-type CancellationRowDb = Database["public"]["Tables"]["cancellations"]["Row"];
-type CancellationRowsViewRow = Database["public"]["Views"]["cancellation_rows"]["Row"];
-type EquipmentRow = Database["public"]["Tables"]["equipment"]["Row"];
-type CoachAttendanceRow = Database["public"]["Tables"]["coach_attendance"]["Row"];
-type CurriculumRow = Database["public"]["Tables"]["curriculum"]["Row"];
-type ClassSlotRow = Database["public"]["Tables"]["class_schedule"]["Row"];
+type Tables = Database["public"]["Tables"];
+type SchoolRow = Tables["schools"]["Row"];
+type CoachRow = Tables["coaches"]["Row"];
+type CoachAttendanceRow = Tables["coach_attendance"]["Row"];
+type SlotRow = Tables["timetable_slots"]["Row"];
+type SessionRow = Tables["pet_sessions"]["Row"];
+
+// Postgres returns "14:10:00"; the app works in "14:10".
+const hhmm = (time: string) => time.slice(0, 5);
 
 export function mapSchool(row: SchoolRow): School {
   return {
@@ -48,85 +30,6 @@ export function mapCoach(row: CoachRow): Coach {
     phone: row.phone,
     assignedSchoolId: row.assigned_school_id,
     status: row.status,
-    rating: Number(row.rating),
-  };
-}
-
-export function mapClass(row: ClassRow): ClassRoom {
-  return {
-    id: row.id,
-    schoolId: row.school_id,
-    className: row.class_name,
-    section: row.section,
-    coachId: row.coach_id,
-    sport: row.sport,
-  };
-}
-
-export function mapAssessment(row: AssessmentRow): Assessment {
-  return {
-    id: row.id,
-    studentName: row.student_name,
-    classId: row.class_id,
-    term: row.term,
-    ratings: row.ratings as Assessment["ratings"],
-    date: row.date,
-  };
-}
-
-export function mapSession(row: SessionRow): Session {
-  return {
-    id: row.id,
-    classId: row.class_id,
-    date: row.date,
-    // Postgres returns "HH:MM:SS"; the app works in "HH:MM".
-    startTime: row.start_time ? row.start_time.slice(0, 5) : null,
-    status: row.status,
-    curriculumWeek: row.curriculum_week,
-    coachId: row.coach_id,
-  };
-}
-
-export function mapClassSlot(row: ClassSlotRow): ClassSlot {
-  return {
-    id: row.id,
-    classId: row.class_id,
-    weekday: row.weekday,
-    startTime: row.start_time.slice(0, 5),
-  };
-}
-
-export function mapCancellation(row: CancellationRowDb): Cancellation {
-  return {
-    id: row.id,
-    sessionId: row.session_id,
-    cancelledBy: row.cancelled_by,
-    reason: row.reason,
-    rescheduledDate: row.rescheduled_date,
-  };
-}
-
-export function mapCancellationRow(row: CancellationRowsViewRow): CancellationRow {
-  return {
-    id: row.id!,
-    date: row.date!,
-    schoolId: row.school_id!,
-    className: row.class_name!,
-    cancelledBy: row.cancelled_by!,
-    reason: row.reason!,
-    rescheduledDate: row.rescheduled_date,
-  };
-}
-
-export function mapEquipment(row: EquipmentRow): Equipment {
-  return {
-    id: row.id,
-    itemName: row.item_name,
-    qty: row.qty,
-    schoolId: row.school_id,
-    condition: row.condition,
-    dateIssued: row.date_issued,
-    status: row.status,
   };
 }
 
@@ -139,38 +42,44 @@ export function mapCoachAttendance(row: CoachAttendanceRow): CoachAttendance {
   };
 }
 
-export function mapCurriculum(row: CurriculumRow): CurriculumWeek {
+export function mapSlot(row: SlotRow): TimetableSlot {
   return {
-    classId: row.class_id,
-    currentWeek: row.current_week,
-    totalWeeks: row.total_weeks,
-    lastDelivered: row.last_delivered ?? "",
+    id: row.id,
+    schoolId: row.school_id,
+    weekday: row.weekday,
+    period: row.period,
+    startTime: hhmm(row.start_time),
+    endTime: hhmm(row.end_time),
+    groupLabel: row.group_label,
+    grade: row.grade,
+    coachId: row.coach_id,
   };
 }
 
-export function mapFitnessAssessment(row: FitnessAssessmentRow): FitnessAssessment {
+export function mapSession(row: SessionRow): Session {
   return {
     id: row.id,
-    studentId: row.student_id,
-    studentName: row.student_name,
+    code: row.code,
     schoolId: row.school_id,
-    age: row.age,
-    grade: row.grade,
-    section: row.section,
-    className: row.class_name,
-    gender: row.gender,
+    slotId: row.slot_id,
     date: row.date,
-    speed50mSeconds: Number(row.speed_50m_seconds),
-    stamina600mSeconds: Number(row.stamina_600m_seconds),
-    toeTouchCm: Number(row.toe_touch_cm),
-    pushUps: row.push_ups,
-    curls: row.curls,
-    heightCm: Number(row.height_cm),
-    weightKg: Number(row.weight_kg),
-    bmi: Number(row.bmi),
-    attendanceRate: Number(row.attendance_rate),
-    sessionsScheduled: row.sessions_scheduled,
-    sessionsFinished: row.sessions_finished,
-    sessionsMissed: row.sessions_missed,
+    period: row.period,
+    startTime: hhmm(row.start_time),
+    endTime: hhmm(row.end_time),
+    groupLabel: row.group_label,
+    grade: row.grade,
+    teachingWeek: row.teaching_week,
+    block: row.block,
+    weekInBlock: row.week_in_block,
+    // The enum still lists the demo's Tennis; JGS sessions never use it.
+    sport: row.sport as Sport | null,
+    curriculumCode: row.curriculum_code,
+    lesson: row.lesson,
+    coachId: row.coach_id,
+    status: row.status,
+    reason: row.reason,
+    actualDate: row.actual_date,
+    remarks: row.remarks,
+    reportedAt: row.reported_at,
   };
 }

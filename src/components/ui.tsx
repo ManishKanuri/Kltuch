@@ -42,13 +42,13 @@ const STATUS_MARKER: Record<string, string> = {
   Done: "bg-hue-lime",
   Present: "bg-hue-lime",
   Active: "bg-hue-lime",
-  Good: "bg-hue-lime",
-  Pending: "bg-hue-amber",
-  Fair: "bg-hue-amber",
-  Absent: "bg-hue-orange",
+  Postponed: "bg-hue-amber",
+  "Not Done": "bg-hue-orange",
   Cancelled: "bg-hue-orange",
-  Damaged: "bg-hue-orange",
-  Replace: "bg-hue-orange",
+  Missed: "bg-hue-orange",
+  Absent: "bg-hue-orange",
+  "Not reported": "bg-faint",
+  Upcoming: "bg-line",
   Inactive: "bg-faint",
   School: "bg-hue-blue",
   KLUTCH: "bg-hue-orange",
@@ -270,9 +270,16 @@ export function SportBadge({
   sport,
   showLabel = true,
 }: {
-  sport: Sport;
+  sport: Sport | null;
   showLabel?: boolean;
 }) {
+  if (!sport) {
+    return (
+      <span className="inline-flex items-center rounded-sm border border-dashed border-line px-1.5 py-0.5 text-[12px] font-medium text-muted">
+        Sport to confirm
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-elevated px-1.5 py-0.5 text-[12px] font-medium text-content">
       <Icon name={SPORT_ICON[sport]} size={13} style={{ color: SPORT_COLOR[sport] }} />

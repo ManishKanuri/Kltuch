@@ -46,6 +46,7 @@ export type Database = {
           date: string
           id: string
           ratings: Json
+          student_id: string | null
           student_name: string
           term: string
           updated_at: string
@@ -56,6 +57,7 @@ export type Database = {
           date: string
           id?: string
           ratings: Json
+          student_id?: string | null
           student_name: string
           term: string
           updated_at?: string
@@ -66,6 +68,7 @@ export type Database = {
           date?: string
           id?: string
           ratings?: Json
+          student_id?: string | null
           student_name?: string
           term?: string
           updated_at?: string
@@ -76,6 +79,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -433,6 +443,109 @@ export type Database = {
           },
         ]
       }
+      pet_sessions: {
+        Row: {
+          actual_date: string | null
+          block: number
+          coach_id: string | null
+          code: string
+          created_at: string
+          curriculum_code: string | null
+          date: string
+          end_time: string
+          grade: number | null
+          group_label: string
+          id: string
+          lesson: string | null
+          period: number
+          reason: string | null
+          remarks: string | null
+          reported_at: string | null
+          school_id: string
+          slot_id: string | null
+          sport: Database["public"]["Enums"]["sport"] | null
+          start_time: string
+          status: Database["public"]["Enums"]["delivery_status"]
+          teaching_week: number
+          updated_at: string
+          week_in_block: number
+        }
+        Insert: {
+          actual_date?: string | null
+          block: number
+          coach_id?: string | null
+          code: string
+          created_at?: string
+          curriculum_code?: string | null
+          date: string
+          end_time: string
+          grade?: number | null
+          group_label: string
+          id?: string
+          lesson?: string | null
+          period: number
+          reason?: string | null
+          remarks?: string | null
+          reported_at?: string | null
+          school_id: string
+          slot_id?: string | null
+          sport?: Database["public"]["Enums"]["sport"] | null
+          start_time: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          teaching_week: number
+          updated_at?: string
+          week_in_block: number
+        }
+        Update: {
+          actual_date?: string | null
+          block?: number
+          coach_id?: string | null
+          code?: string
+          created_at?: string
+          curriculum_code?: string | null
+          date?: string
+          end_time?: string
+          grade?: number | null
+          group_label?: string
+          id?: string
+          lesson?: string | null
+          period?: number
+          reason?: string | null
+          remarks?: string | null
+          reported_at?: string | null
+          school_id?: string
+          slot_id?: string | null
+          sport?: Database["public"]["Enums"]["sport"] | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          teaching_week?: number
+          updated_at?: string
+          week_in_block?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_sessions_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_sessions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_sessions_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "timetable_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           coach_id: string | null
@@ -553,6 +666,117 @@ export type Database = {
           },
         ]
       }
+      students: {
+        Row: {
+          active: boolean
+          admission_no: string
+          class_id: string | null
+          created_at: string
+          date_of_birth: string | null
+          full_name: string
+          gender: Database["public"]["Enums"]["gender"] | null
+          id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          admission_no: string
+          class_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name: string
+          gender?: Database["public"]["Enums"]["gender"] | null
+          id?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          admission_no?: string
+          class_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name?: string
+          gender?: Database["public"]["Enums"]["gender"] | null
+          id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_class_id_school_id_fkey"
+            columns: ["class_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timetable_slots: {
+        Row: {
+          coach_id: string | null
+          created_at: string
+          end_time: string
+          grade: number | null
+          group_label: string
+          id: string
+          period: number
+          school_id: string
+          start_time: string
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          coach_id?: string | null
+          created_at?: string
+          end_time: string
+          grade?: number | null
+          group_label: string
+          id?: string
+          period: number
+          school_id: string
+          start_time: string
+          updated_at?: string
+          weekday: number
+        }
+        Update: {
+          coach_id?: string | null
+          created_at?: string
+          end_time?: string
+          grade?: number | null
+          group_label?: string
+          id?: string
+          period?: number
+          school_id?: string
+          start_time?: string
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetable_slots_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       cancellation_rows: {
@@ -587,13 +811,19 @@ export type Database = {
     Enums: {
       cancelled_by: "School" | "KLUTCH"
       coach_status: "Active" | "Inactive"
+      delivery_status:
+        | "Not reported"
+        | "Done"
+        | "Not Done"
+        | "Cancelled"
+        | "Postponed"
       equipment_condition: "Good" | "Fair" | "Damaged"
       equipment_status: "Active" | "Replace"
       fitness_section: "A" | "B" | "C"
       gender: "Female" | "Male"
       role: "admin" | "coach" | "school"
       session_status: "Done" | "Pending" | "Cancelled"
-      sport: "Football" | "Basketball" | "Tennis"
+      sport: "Football" | "Basketball" | "Tennis" | "Volleyball"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -726,13 +956,20 @@ export const Constants = {
     Enums: {
       cancelled_by: ["School", "KLUTCH"],
       coach_status: ["Active", "Inactive"],
+      delivery_status: [
+        "Not reported",
+        "Done",
+        "Not Done",
+        "Cancelled",
+        "Postponed",
+      ],
       equipment_condition: ["Good", "Fair", "Damaged"],
       equipment_status: ["Active", "Replace"],
       fitness_section: ["A", "B", "C"],
       gender: ["Female", "Male"],
       role: ["admin", "coach", "school"],
       session_status: ["Done", "Pending", "Cancelled"],
-      sport: ["Football", "Basketball", "Tennis"],
+      sport: ["Football", "Basketball", "Tennis", "Volleyball"],
     },
   },
 } as const

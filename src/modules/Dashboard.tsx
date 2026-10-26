@@ -1,248 +1,221 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { bySchedule, monthLabel, timeLabel, todayISO } from "@/lib/dates";
-import { sportBreakdown } from "@/lib/stats";
-import { SPORT_COLOR, SPORT_ICON } from "@/lib/types";
-import { Icon } from "@/components/icons";
-import {
-  Card,
-  Empty,
-  Meter,
-  OutlineButton,
-  SectionTitle,
-  StatCard,
-  StatGrid,
-  StatusTag,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-} from "@/components/ui";
+import { deliveryRate, isDue, missedByReason, pct, reportingRate, tally } from "@/lib/analytics";
+import { shortDay, todayISO } from "@/lib/dates";
+import type { Session } from "@/lib/types";
+import { BarList, StackedRows, WeeklyChart } from "@/components/charts";
+import { ReportDialog, timeRange } from "@/components/session";
+import { Card, Empty, StatCard, StatGrid, Table, Td, Th, THead, Tr } from "@/components/ui";
+import { ChartCard, ProgrammeStrip, useProgrammeCharts } from "./shared";
 
 export default function Dashboard() {
-  const {
-    sessions,
-    coaches,
-    attendance,
-    assessments,
-    fitnessAssessments,
-    classes,
-    cancellationRows,
-    coachName,
-    classById,
-    schoolName,
-    setActive,
-    live,
-  } = useStore();
+  const { sessions, slots, coaches, attendance, coachName, setActive, live } = useStore();
   const today = todayISO();
+  const { weeks, byClass, bySport, overall } = useProgrammeCharts(sessions, today);
+  const [reporting, setReporting] = useState<Session | null>(null);
 
-  const stats = useMemo(() => {
-    const todaySessions = sessions.filter((s) => s.date === today);
-    const doneToday = todaySessions.filter((s) => s.status === "Done").length;
-    const pendingToday = todaySessions.filter((s) => s.status === "Pending").length;
-    const presentToday = attendance.filter(
-      (a) => a.date === today && a.present
-    ).length;
-    const assessedClassIds = new Set(assessments.map((a) => a.classId));
-    const pendingAssessments = classes.filter(
-      (c) => !assessedClassIds.has(c.id)
-    ).length;
-    const cancelMTD = cancellationRows.filter((r) =>
-      r.date.startsWith(today.slice(0, 7))
-    ).length;
-    return {
-      doneToday,
-      totalToday: todaySessions.length,
-      pendingToday,
-      presentToday,
-      totalCoaches: coaches.length,
-      absentToday: coaches.length - presentToday,
-      pendingAssessments,
-      cancelMTD,
-      fitnessAssessed: fitnessAssessments.length,
-    };
-  }, [today, sessions, coaches, attendance, assessments, classes, cancellationRows, fitnessAssessments]);
-
-  // Completion counts sessions up to today; future ones from the timetable aren't due yet.
-  const sports = useMemo(
-    () => sportBreakdown(classes, sessions.filter((s) => s.date <= today)),
-    [classes, sessions, today]
+  const overdue = useMemo(
+    () =>
+      sessions
+        .filter((s) => s.date < today && s.status === "Not reported")
+        .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
+    [sessions, today]
   );
-  const fitnessEngagement = useMemo(() => {
-    const scheduled = fitnessAssessments.reduce((sum, record) => sum + record.sessionsScheduled, 0);
-    const finished = fitnessAssessments.reduce((sum, record) => sum + record.sessionsFinished, 0);
-    const missed = fitnessAssessments.reduce((sum, record) => sum + record.sessionsMissed, 0);
-    const attendanceRate = scheduled ? Math.round((finished / scheduled) * 100) : 0;
-    return { finished, missed, attendanceRate };
-  }, [fitnessAssessments]);
+  const missed = overall.Missed + overall.Postponed;
+  const rate = deliveryRate(overall);
+  const reported = reportingRate(overall);
+  const activeCoaches = coaches.filter((c) => c.status === "Active");
+  const presentToday = attendance.filter((a) => a.date === today && a.present).length;
+  const unassignedSlots = slots.filter((s) => !s.coachId).length;
+  const mixedSlots = slots.filter((s) => s.grade === null);
+  const reasons = missedByReason(sessions);
 
-  const activity = useMemo(() => {
-    return sessions
-      .filter((s) => s.date === today)
-      .sort(bySchedule)
-      .map((s) => {
-        const cls = classById(s.classId);
-        return {
-          key: s.id,
-          time: timeLabel(s.startTime) || "—",
-          coach: coachName(s.coachId),
-          school: cls ? schoolName(cls.schoolId) : "—",
-          sport: cls?.sport,
-          action:
-            s.status === "Cancelled"
-              ? "Session cancelled"
-              : `${cls?.className ?? ""}, curriculum week ${s.curriculumWeek}`,
-          status: s.status,
-        };
-      });
-  }, [today, sessions, classById, coachName, schoolName]);
+  const coachRows = useMemo(() => {
+    const month = today.slice(0, 7);
+    return coaches.map((c) => {
+      const mine = sessions.filter((s) => s.coachId === c.id);
+      const t = tally(mine, today);
+      const marks = attendance.filter((a) => a.coachId === c.id && a.date.startsWith(month));
+      return {
+        coach: c,
+        slots: slots.filter((s) => s.coachId === c.id).length,
+        t,
+        overdue: mine.filter((s) => s.date < today && s.status === "Not reported").length,
+        present: marks.filter((a) => a.present).length,
+        marked: marks.length,
+      };
+    });
+  }, [coaches, sessions, slots, attendance, today]);
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
+      <ProgrammeStrip today={today} />
+
       <StatGrid cols={4}>
         <StatCard
-          label="Sessions today"
-          icon="session"
-          tone="blue"
-          value={
-            <>
-              {stats.doneToday}
-              <span className="text-xl text-faint">/{stats.totalToday}</span>
-            </>
-          }
-          sub={`${stats.pendingToday} still pending`}
-        />
-        <StatCard
-          label="Coaches present"
-          icon="attendance"
+          label="Sessions delivered"
+          icon="check-circle"
           tone="tennis"
-          value={
-            <>
-              {stats.presentToday}
-              <span className="text-xl text-faint">/{stats.totalCoaches}</span>
-            </>
-          }
-          sub={`${stats.absentToday} absent today`}
+          value={overall.due ? `${rate}%` : "—"}
+          sub={overall.due ? `${overall.Done} of ${overall.due} due so far` : `${overall.total} sessions planned`}
         />
         <StatCard
-          label="Fitness baselines"
-          icon="assessment"
-          tone="orange"
-          value={stats.fitnessAssessed.toLocaleString()}
-          sub={`${stats.pendingAssessments} classes still need skill ratings`}
+          label="Waiting for a report"
+          icon="clock"
+          tone={overdue.length ? "orange" : "neutral"}
+          value={overdue.length}
+          sub={overall.due ? `${reported}% of due sessions reported` : "Coaches report after each session"}
         />
         <StatCard
-          label="Cancellations this month"
+          label="Missed or postponed"
           icon="cancel"
-          tone="neutral"
-          value={stats.cancelMTD}
-          sub={monthLabel(today)}
+          tone={missed ? "orange" : "neutral"}
+          value={missed}
+          sub={overall.due ? `${pct(missed, overall.due)}% of due sessions` : "None yet"}
+        />
+        <StatCard
+          label="Coaches present today"
+          icon="attendance"
+          value={`${presentToday} of ${activeCoaches.length}`}
+          sub={
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse-dot bg-hue-lime motion-reduce:animate-none" : "bg-faint"}`} />
+              {live ? "Updating live" : "Connecting…"}
+            </span>
+          }
         />
       </StatGrid>
 
-      <div className="flex flex-wrap gap-2">
-        <OutlineButton icon="attendance" onClick={() => setActive("coach-attendance")}>
-          Mark attendance
-        </OutlineButton>
-        <OutlineButton icon="session" onClick={() => setActive("session-tracker")}>
-          Log session
-        </OutlineButton>
-        <OutlineButton icon="cancel" onClick={() => setActive("cancellation-log")}>
-          Log cancellation
-        </OutlineButton>
-        <OutlineButton icon="assessment" onClick={() => setActive("student-assessment")}>
-          Add assessment
-        </OutlineButton>
+      <ChartCard title="Sessions by teaching week" sub="Every planned PET session, by what happened. Hover or tap a week for its numbers.">
+        <WeeklyChart weeks={weeks} />
+      </ChartCard>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title="By class" sub="Mixed 8/9 are the two cross-class groups, 9C/8A and 9H/8I.">
+          <StackedRows rows={byClass} />
+        </ChartCard>
+        <ChartCard title="By sport" sub="Sports change every six weeks, so these totals shift by block.">
+          <StackedRows rows={bySport} />
+        </ChartCard>
       </div>
 
-      <div>
-        <SectionTitle icon="attendance">Fitness engagement</SectionTitle>
-        <StatGrid cols={3}>
-          <StatCard label="Student attendance" icon="attendance" tone="tennis" value={`${fitnessEngagement.attendanceRate}%`} sub="Across recorded fitness sessions" />
-          <StatCard label="Sessions finished" icon="check-circle" tone="blue" value={fitnessEngagement.finished.toLocaleString()} sub="Student session completions" />
-          <StatCard label="Sessions missed" icon="cancel" tone="orange" value={fitnessEngagement.missed.toLocaleString()} sub="Worth a follow-up with the school" />
-        </StatGrid>
-      </div>
-
-      <div>
-        <SectionTitle icon="trophy">Sports at a glance</SectionTitle>
-        <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
-          {sports.map((sp) => (
-            <div key={sp.sport} className="bg-surface p-5">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2 font-display text-[1.0625rem] font-extrabold tracking-[-0.015em] text-content">
-                  <Icon name={SPORT_ICON[sp.sport]} size={19} style={{ color: SPORT_COLOR[sp.sport] }} />
-                  {sp.sport}
-                </span>
-                <span className="font-mono text-sm font-bold text-content">{sp.rate}%</span>
-              </div>
-              <div className="mt-3">
-                <Meter
-                  value={sp.rate}
-                  tone={
-                    sp.sport === "Football"
-                      ? "blue"
-                      : sp.sport === "Basketball"
-                        ? "orange"
-                        : "tennis"
-                  }
-                />
-              </div>
-              <div className="mt-2.5 flex justify-between text-[12.5px] text-muted">
-                <span>{sp.classes} classes</span>
-                <span className="font-mono">
-                  {sp.done}/{sp.sessions} sessions done
-                </span>
-              </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="p-5">
+          <h2 className="font-display text-[1.0625rem] font-extrabold tracking-[-0.015em] text-content">Needs attention</h2>
+          <ul className="mt-3 divide-y divide-line text-sm">
+            {unassignedSlots > 0 && (
+              <AttentionItem
+                title={`${unassignedSlots} of ${slots.length} weekly slots have no coach`}
+                body="Coaches only see the sessions assigned to them."
+                action="Assign coaches"
+                onClick={() => setActive("timetable")}
+              />
+            )}
+            {mixedSlots.length > 0 && (
+              <AttentionItem
+                title={`Confirm the mixed groups ${mixedSlots.map((s) => s.groupLabel).join(" and ")}`}
+                body="Classes 8 and 9 play the same sport every block, so their sessions are planned with it. Check with the school who attends."
+              />
+            )}
+            {overdue.length > 0 && (
+              <AttentionItem
+                title={`${overdue.length} past session${overdue.length === 1 ? "" : "s"} not reported`}
+                body="They count as not delivered until a coach reports them."
+                action="Open session tracking"
+                onClick={() => setActive("sessions")}
+              />
+            )}
+            {!unassignedSlots && !mixedSlots.length && !overdue.length && (
+              <li className="py-3 text-faint">Nothing waiting. Every due session is reported.</li>
+            )}
+          </ul>
+          {overdue.length > 0 && (
+            <div className="mt-4 overflow-hidden rounded-lg border border-line">
+              <Table>
+                <THead>
+                  <Th>Session</Th>
+                  <Th>Coach</Th>
+                </THead>
+                <tbody>
+                  {overdue.slice(0, 6).map((s, i) => (
+                    <Tr key={s.id} i={i}>
+                      <Td>
+                        <button onClick={() => setReporting(s)} className="text-left font-semibold text-accent hover:underline">
+                          {s.groupLabel}
+                        </button>
+                        <div className="text-[12px] text-faint">
+                          {shortDay(s.date)}, {timeRange(s)}
+                        </div>
+                      </Td>
+                      <Td className={s.coachId ? "" : "text-faint"}>{coachName(s.coachId)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
             </div>
-          ))}
-        </div>
+          )}
+        </Card>
+
+        <ChartCard title="Why sessions didn't happen" sub="Missed and postponed sessions, by the reason the coach gave.">
+          <BarList
+            rows={reasons.map((r) => ({ label: r.reason, sub: r.side === "Other" ? undefined : `${r.side} side`, value: r.count }))}
+            empty="No missed or postponed sessions yet."
+          />
+        </ChartCard>
       </div>
 
       <div>
-        <SectionTitle
-          icon="clock"
-          right={
-            <span role="status" className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-              <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse-dot bg-hue-lime" : "bg-faint"}`} />
-              {live ? "Live" : "Connecting"}
-            </span>
-          }
-        >
-          Today’s sessions
-        </SectionTitle>
+        <h2 className="mb-3 font-display text-[1.1875rem] font-extrabold tracking-[-0.02em] text-content">Coaches</h2>
         <Card className="overflow-hidden">
           <Table>
             <THead>
-              <Th>Time</Th>
               <Th>Coach</Th>
-              <Th>School</Th>
-              <Th>Activity</Th>
-              <Th>Status</Th>
+              <Th>Weekly slots</Th>
+              <Th>Delivered</Th>
+              <Th>Not reported</Th>
+              <Th>Present this month</Th>
             </THead>
             <tbody>
-              {activity.map((r, i) => (
-                <Tr key={r.key} i={i}>
-                  <Td className="font-mono text-[13px] text-faint">{r.time}</Td>
-                  <Td className="font-semibold text-content">{r.coach}</Td>
-                  <Td>{r.school}</Td>
-                  <Td>{r.action}</Td>
-                  <Td>
-                    <StatusTag value={r.status} />
-                  </Td>
+              {coachRows.map(({ coach, slots: n, t, overdue: late, present, marked }, i) => (
+                <Tr key={coach.id} i={i}>
+                  <Td className="font-semibold text-content">{coach.name}</Td>
+                  <Td className="font-mono">{n}</Td>
+                  <Td className="font-mono">{t.due ? `${t.Done} of ${t.due} (${deliveryRate(t)}%)` : "—"}</Td>
+                  <Td className={`font-mono ${late ? "font-semibold text-bad" : ""}`}>{late}</Td>
+                  <Td className="font-mono">{marked ? `${present} of ${marked} days` : "No days marked"}</Td>
                 </Tr>
               ))}
-              {activity.length === 0 && <Empty cols={5}>No sessions scheduled today.</Empty>}
+              {coachRows.length === 0 && <Empty cols={5}>No coaches yet. Add them on the Coaches screen.</Empty>}
             </tbody>
           </Table>
-          <div className="border-t border-line px-4 py-3 text-[12.5px] text-faint">
-            Coaches log attendance and sessions from their phones, and changes show up here as they happen.
-          </div>
         </Card>
+        {sessions.some((s) => isDue(s, today) && !s.coachId) && (
+          <p className="mt-2 text-[12.5px] text-faint">Sessions without a coach aren't counted for anyone above.</p>
+        )}
       </div>
+
+      {reporting && <ReportDialog session={reporting} admin onClose={() => setReporting(null)} />}
     </div>
+  );
+}
+
+function AttentionItem({ title, body, action, onClick }: { title: string; body: string; action?: string; onClick?: () => void }) {
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-3 py-3">
+      <div className="min-w-0">
+        <div className="font-semibold text-content">{title}</div>
+        <div className="mt-0.5 text-[13px] text-muted">{body}</div>
+      </div>
+      {action && (
+        <button
+          onClick={onClick}
+          className="shrink-0 rounded-sm border border-line px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent"
+        >
+          {action}
+        </button>
+      )}
+    </li>
   );
 }

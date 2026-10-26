@@ -1,10 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { OPEN_ACCESS } from "@/lib/access";
 
 // Refreshes the Supabase session cookie on every request and redirects
 // unauthenticated users to /login. Mirrors @supabase/ssr's documented
 // middleware pattern for the Next.js App Router.
 export async function middleware(request: NextRequest) {
+  // While sign-in is off, nobody is sent to /login, and /login sends people in.
+  if (OPEN_ACCESS) {
+    if (request.nextUrl.pathname.startsWith("/login")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

@@ -1,8 +1,48 @@
-# KLUTCH SportsEd — Internal ERP (Demo Dashboard)
+# KLUTCH SportsEd — PET Programme Dashboard
 
-A working demo of the KLUTCH SportsEd internal ERP from the Developer Brief.
-All modules and **3 user roles** are integrated into one app, driven by
-realistic **mock data** (no backend required).
+Session tracking, coach attendance and programme analytics for the PET
+programme at Johnson Grammar School, Mallapur (Classes 8–12, 24 weeks from
+2 November 2026). Next.js 15 (App Router) on Vercel, Supabase (Postgres, live
+updates) in Mumbai.
+
+Live: https://kltuch.vercel.app
+
+## Who sees what
+
+- **Admin** (KLUTCH): programme dashboard with charts, session tracking for every
+  session, the timetable with coach assignment, coaches, and coach attendance.
+- **Coach**: a phone-first view of today's sessions (one tap for Done), a reason
+  and remarks when a session didn't happen, sessions still waiting for a report,
+  and their own attendance.
+- **School**: delivery analytics by week, class and sport, curriculum progress,
+  why sessions were missed (school side or KLUTCH side), and this week's
+  schedule. Internal remarks and coach attendance are never shown here.
+
+**Sign-in is off for the pilot** (`src/lib/access.ts`): each device picks a view
+on the start screen, and anyone with the link can use any view. To turn sign-in
+back on, set `OPEN_ACCESS` to `false` and add a migration that drops the
+"open pilot" policies (see `supabase/migrations/*_open_access_pilot.sql`). Invites
+then work from the Team access screen.
+
+## The programme data
+
+Everything planned comes from `src/lib/programme.ts`:
+
+- the master PET timetable (45 weekly slots; a slash pair such as 10J/10L is one
+  session), with periods and times from the school's timetable PDF;
+- the sports rotation (four blocks of six weeks, Football, Basketball,
+  Volleyball) and the six-week curriculum codes and lessons;
+- reference holidays, which are reminders only.
+
+Each session keeps the plan it was created with (sport, curriculum code, lesson,
+teaching week) and a stable code such as `JGS-20261102-P8-8D`. Sessions are
+loaded for 2 November to 30 December; later weeks are added from the Timetable
+screen once the school confirms its calendar.
+
+Statuses are Done, Not Done, Cancelled and Postponed; "Not reported" means no
+one has reported it yet. A session counts as **due** once its date has passed,
+or on the day once it's reported, and the **delivery rate** is Done out of due
+(`src/lib/analytics.ts`), so unreported sessions never count as delivered.
 
 ## Run it
 
@@ -10,116 +50,32 @@ realistic **mock data** (no backend required).
 npm install
 npm run dev      # http://localhost:3000
 npm run build    # production build
-npm run start    # serve the production build
-npm run lint     # eslint / next lint
 ```
 
-## Stack & identity
+Needs `.env.local` with `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (server and scripts
+only) and `SUPABASE_ACCESS_TOKEN` (Supabase CLI only). The file is git-ignored.
 
-- **Next.js 15** (App Router) + **React 19**
-- **Tailwind CSS** with a **KLUTCH brand design system** — the logo's
-  blue→orange gradient, tennis-yellow accents, `Sora` display + `Inter` body
-  fonts, and a signature dark sidebar.
-- **Light / dark ("day / night") mode** — toggle in the top bar, persisted to
-  `localStorage`, no flash on load.
-- **Custom SVG logo mark** (`src/components/Logo.tsx`) — a vector interpretation
-  of the K (blue court + orange basketball arms + tennis ball).
-- **Custom line-icon set** (`src/components/icons.tsx`) — no emoji anywhere.
-- **Mock data store** — React Context (`src/lib/store.tsx`), seeded from
-  `src/lib/seed.ts` and `src/lib/fitnessSeed.ts` with schools, coaches, sessions,
-  assessments, cancellations, equipment, and CISCE fitness records (plus a
-  `sport` per class: Football / Basketball / Tennis). In-memory and interactive;
-  resets on refresh.
-- **Client-side PDF export** — `jspdf` + `html2canvas-pro` (both lazy-loaded, so
-  they stay out of the initial bundle).
+Load or top up the programme (safe to rerun; it never overwrites reports or
+coach assignments):
 
-## Analytics & report cards
+```bash
+set -a && source .env.local && set +a && npx tsx scripts/seed-jgs.ts
+```
 
-- **Sports Analytics** — completion by sport, team skill averages,
-  sessions-by-status, and a coach leaderboard. Sport identity is always encoded
-  by **icon + label + value** (not color alone) — the categorical palette was
-  validated for colorblind separation.
-- **CISCE Fitness Analytics** — fitness metrics (50m dash, 600m run/walk,
-  forward toe touch, push-ups, curls, BMI, attendance) analyzed against
-  same-school-and-grade cohorts.
-- **Player Report Card** — per-student report (Student Assessment → "Report
-  Card"): overall grade, comparison vs class average, per-skill bars with
-  class-average markers, and auto-derived strengths / focus areas.
-- **CISCE Fitness Report Card** — per-student fitness report (Fitness Analytics
-  → "Report Card"): cohort profile, per-metric breakdown vs the school-grade
-  average, and coaching focus areas.
-
-### Download to PDF
-
-Both report cards have a **Download PDF** button that produces a real file and
-saves it to your machine's Downloads folder — no backend, one click.
-
-- Implemented in `src/lib/pdf.ts` (`downloadElementPdf`), shared by both cards.
-- Captures the live report card DOM at 2× resolution and writes a **single,
-  content-sized page** (no clipping, no wasted whitespace).
-- Renders the export with **light-theme tokens** for a crisp, print-friendly
-  document even when the dashboard is in dark mode; the branded dark header is
-  preserved.
-- Interactive controls (the download / save buttons) are marked `data-pdf-hide`
-  and stripped from the exported document.
-
-## What's integrated
-
-Use the **role switcher** (top-right: Admin / Coach / School) to move between
-the three experiences.
-
-| Role | What you see |
-|------|--------------|
-| **Admin** | Full sidebar → all modules + dashboard |
-| **Coach** | Phone-first mobile screen: attendance toggle, session tick, cancellation (≤ 3 actions) |
-| **School** | 4-tab portal (Sessions / Curriculum / Students / Report), scoped to one school |
-
-### Modules (Admin sidebar)
-
-**Overview**
-1. **Dashboard** — stat cards, quick actions, live Recent Activity table
-2. **Sports Analytics** — completion by sport, skill averages, coach leaderboard
-3. **Fitness Analytics** — CISCE fitness metrics + fitness report cards
-
-**Coaches**
-4. **Coach Management** — profiles, school assignment, star performance ratings, add coach
-5. **Coach Attendance** — one-tap present/absent per coach
-
-**Sessions**
-6. **Session Tracker** — filterable table (school + status), update session status
-7. **Cancellation Log** — log cancellations (School / KLUTCH) with reason + reschedule
-8. **Curriculum Tracker** — per-class week progress bars
-
-**Students & Equipment**
-9. **Student Assessment** — 1–5 skill ratings + auto report-card modal (PDF export)
-10. **Equipment Log** — inventory per school, condition cycling, replace flags
-
-**Portals**
-11. **School Portal** — school-facing 4-tab view + downloadable monthly report (demo)
-12. **Coach Mobile View** — the phone-first coach experience
-
-## Everything is live-linked
-
-Actions update the shared store, so e.g. marking a session **Done** in the
-Coach view or Session Tracker updates the Admin dashboard stat cards and
-curriculum progress immediately — mirroring the real-time behavior the brief
-specifies for Supabase.
+Database changes live in `supabase/migrations` (`npx supabase db push`). The
+older demo tables (sessions, classes, assessments, fitness) are still in the
+database with their sample rows; the app no longer reads them.
 
 ## Project structure
 
 ```
 src/
-  app/          layout, page, global styles
-  components/   Logo, icons, shell, theme, shared UI, FitnessReportCards
-  lib/          store (context), seed data, stats, types, nav, pdf export
-  modules/      one file per module (Dashboard, SportsAnalytics, etc.)
+  app/          root layout, login (unused while sign-in is off), invite API
+  components/   shell, charts, session report dialog, shared UI, icons
+  lib/          programme plan, analytics, store (data + saves), types, dates
+  modules/      Dashboard, Sessions, Timetable, Coaches, Attendance,
+                CoachView, SchoolView, TeamAccess
+scripts/        seed-jgs.ts, invite-user.ts
+supabase/       migrations
 ```
-
-## Mapping to production
-
-This demo intentionally uses mock data. To go live per the brief, swap
-`src/lib/store.tsx` reads/writes for Supabase (PostgreSQL + Auth), keep the
-same table shape defined in `src/lib/types.ts`, and — if you want
-server-generated documents — move PDF rendering server-side (React-PDF /
-Puppeteer). The current client-side export in `src/lib/pdf.ts` already works for
-on-demand downloads with no backend. The UI layer stays as-is.

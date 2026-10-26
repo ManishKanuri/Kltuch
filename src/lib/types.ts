@@ -1,4 +1,4 @@
-// KLUTCH SportsEd — domain types (mirror the 8 DB tables in the brief)
+// KLUTCH SportsEd — domain types for the JGS PET programme (see programme.ts).
 
 export type Role = "admin" | "coach" | "school";
 
@@ -9,7 +9,6 @@ export interface Coach {
   phone: string;
   assignedSchoolId: string;
   status: CoachStatus;
-  rating: number; // 1-5 performance
 }
 
 export interface School {
@@ -19,119 +18,63 @@ export interface School {
   contactPerson: string;
 }
 
-export type Sport = "Football" | "Basketball" | "Tennis";
+export type Sport = "Football" | "Basketball" | "Volleyball";
 
-export const SPORTS: Sport[] = ["Football", "Basketball", "Tennis"];
+export const SPORTS: Sport[] = ["Football", "Basketball", "Volleyball"];
 
 // Categorical brand hue per sport (paired with icon + label everywhere).
 // Theme-aware: resolves to the brighter on-dark variant in dark mode.
 export const SPORT_COLOR: Record<Sport, string> = {
   Football: "rgb(var(--hue-blue))",
   Basketball: "rgb(var(--hue-orange))",
-  Tennis: "rgb(var(--hue-lime))",
+  Volleyball: "rgb(var(--hue-lime))",
 };
 
-export const SPORT_ICON: Record<Sport, "football" | "basketball" | "tennis"> = {
+export const SPORT_ICON: Record<Sport, "football" | "basketball" | "volleyball"> = {
   Football: "football",
   Basketball: "basketball",
-  Tennis: "tennis",
+  Volleyball: "volleyball",
 };
 
-export interface ClassRoom {
+// One weekly PET slot from the school's timetable. The coach assigned here is
+// copied onto that slot's sessions that haven't been reported yet.
+export interface TimetableSlot {
   id: string;
   schoolId: string;
-  className: string; // e.g. "Class 5A"
-  section: string;
-  coachId: string;
-  sport: Sport;
+  weekday: number; // 1 = Monday … 6 = Saturday
+  period: number;
+  startTime: string; // "14:10"
+  endTime: string;
+  groupLabel: string; // "10J/10L"
+  grade: number | null; // null for a mixed group such as 9C/8A
+  coachId: string | null;
 }
 
-export type SessionStatus = "Done" | "Pending" | "Cancelled";
+export type SessionStatus = "Not reported" | "Done" | "Not Done" | "Cancelled" | "Postponed";
+
 export interface Session {
   id: string;
-  classId: string;
-  date: string; // ISO date
-  startTime: string | null; // "HH:MM", IST wall-clock; null for sessions created before scheduling
+  code: string; // "JGS-20261102-P8-8D", stable for the life of the session
+  schoolId: string;
+  slotId: string | null;
+  date: string;
+  period: number;
+  startTime: string;
+  endTime: string;
+  groupLabel: string;
+  grade: number | null;
+  teachingWeek: number;
+  block: number;
+  weekInBlock: number;
+  sport: Sport | null;
+  curriculumCode: string | null;
+  lesson: string | null;
+  coachId: string | null;
   status: SessionStatus;
-  curriculumWeek: number;
-  coachId: string;
-}
-
-// One weekly timetable slot for a class, e.g. Class 5A on Mondays at 09:15.
-export interface ClassSlot {
-  id: string;
-  classId: string;
-  weekday: number; // ISO weekday: 1 = Monday ... 7 = Sunday
-  startTime: string; // "HH:MM"
-}
-
-export type CancelledBy = "School" | "KLUTCH";
-export interface Cancellation {
-  id: string;
-  sessionId: string;
-  cancelledBy: CancelledBy;
-  reason: string;
-  rescheduledDate: string | null;
-}
-
-// Denormalized row used by the Cancellation Log table
-export interface CancellationRow {
-  id: string;
-  date: string;
-  schoolId: string;
-  className: string;
-  cancelledBy: CancelledBy;
-  reason: string;
-  rescheduledDate: string | null;
-}
-
-export type SkillKey = "motorSkills" | "coordination" | "fitness" | "attitude";
-export interface Assessment {
-  id: string;
-  studentName: string;
-  classId: string;
-  term: string;
-  ratings: Record<SkillKey, number>; // 1-5 each
-  date: string;
-}
-
-// CISCE physical-fitness measurements. BMI is stored as a measurement only;
-// child BMI categories require age- and sex-specific clinical reference data.
-export interface FitnessAssessment {
-  id: string;
-  studentId: string;
-  studentName: string;
-  schoolId: string;
-  age: number;
-  grade: number;
-  section: "A" | "B" | "C";
-  className: string;
-  gender: "Female" | "Male";
-  date: string;
-  speed50mSeconds: number;
-  stamina600mSeconds: number;
-  toeTouchCm: number;
-  pushUps: number;
-  curls: number;
-  heightCm: number;
-  weightKg: number;
-  bmi: number;
-  attendanceRate: number;
-  sessionsScheduled: number;
-  sessionsFinished: number;
-  sessionsMissed: number;
-}
-
-export type EquipmentCondition = "Good" | "Fair" | "Damaged";
-export type EquipmentStatus = "Active" | "Replace";
-export interface Equipment {
-  id: string;
-  itemName: string;
-  qty: number;
-  schoolId: string;
-  condition: EquipmentCondition;
-  dateIssued: string;
-  status: EquipmentStatus;
+  reason: string | null;
+  actualDate: string | null; // when it really happened, if not on the scheduled date
+  remarks: string | null; // internal to KLUTCH; never shown to the school
+  reportedAt: string | null;
 }
 
 export interface CoachAttendance {
@@ -140,26 +83,3 @@ export interface CoachAttendance {
   date: string;
   present: boolean;
 }
-
-export interface CurriculumWeek {
-  classId: string;
-  currentWeek: number;
-  totalWeeks: number;
-  lastDelivered: string;
-}
-
-export const SKILL_LABELS: Record<SkillKey, string> = {
-  motorSkills: "Motor Skills",
-  coordination: "Coordination",
-  fitness: "Fitness",
-  attitude: "Attitude",
-};
-
-export const CANCEL_REASONS = [
-  "School event",
-  "Exam prep",
-  "Coach sick",
-  "Weather",
-  "Holiday",
-  "Ground unavailable",
-];

@@ -1,20 +1,15 @@
 import type { IconName } from "@/components/icons";
+import { OPEN_ACCESS } from "./access";
 import type { Role } from "./types";
 
 export type ModuleKey =
   | "dashboard"
-  | "sports-analytics"
-  | "fitness-analytics"
-  | "coach-management"
-  | "coach-attendance"
+  | "sessions"
   | "timetable"
-  | "session-tracker"
-  | "cancellation-log"
-  | "curriculum-tracker"
-  | "student-assessment"
-  | "equipment-log"
-  | "school-portal"
-  | "coach-mobile"
+  | "coaches"
+  | "attendance"
+  | "school-view"
+  | "coach-view"
   | "team-access";
 
 export interface NavItem {
@@ -31,64 +26,43 @@ export interface NavSection {
 export const ADMIN_NAV: NavSection[] = [
   {
     label: "Overview",
+    items: [{ key: "dashboard", label: "Dashboard", icon: "dashboard" }],
+  },
+  {
+    label: "Sessions",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: "dashboard" },
-      { key: "sports-analytics", label: "Sports Analytics", icon: "analytics" },
-      { key: "fitness-analytics", label: "Fitness Analytics", icon: "assessment" },
+      { key: "sessions", label: "Session tracking", icon: "session" },
+      { key: "timetable", label: "Timetable", icon: "calendar" },
     ],
   },
   {
     label: "Coaches",
     items: [
-      { key: "coach-management", label: "Coach Management", icon: "coaches" },
-      { key: "coach-attendance", label: "Coach Attendance", icon: "attendance" },
+      { key: "attendance", label: "Coach attendance", icon: "attendance" },
+      { key: "coaches", label: "Coaches", icon: "coaches" },
     ],
   },
   {
-    label: "Sessions",
+    label: "Other views",
     items: [
-      { key: "timetable", label: "Timetable", icon: "calendar" },
-      { key: "session-tracker", label: "Session Tracker", icon: "session" },
-      { key: "cancellation-log", label: "Cancellation Log", icon: "cancel" },
-      { key: "curriculum-tracker", label: "Curriculum Tracker", icon: "curriculum" },
+      { key: "school-view", label: "School view", icon: "school" },
+      { key: "coach-view", label: "Coach view", icon: "mobile" },
     ],
   },
-  {
-    label: "Students & Equipment",
-    items: [
-      { key: "student-assessment", label: "Student Assessment", icon: "assessment" },
-      { key: "equipment-log", label: "Equipment Log", icon: "equipment" },
-    ],
-  },
-  {
-    label: "Portals",
-    items: [
-      { key: "school-portal", label: "School Portal", icon: "school" },
-      { key: "coach-mobile", label: "Coach Mobile View", icon: "mobile" },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { key: "team-access", label: "Team Access", icon: "coaches" },
-    ],
-  },
+  // Invites only matter once sign-in is back on.
+  ...(OPEN_ACCESS
+    ? []
+    : [{ label: "Admin", items: [{ key: "team-access" as const, label: "Team access", icon: "coaches" as const }] }]),
 ];
 
 export const PAGE_TITLES: Record<ModuleKey, string> = {
-  dashboard: "Admin Dashboard",
-  "sports-analytics": "Sports Analytics",
-  "fitness-analytics": "CISCE Fitness Analytics",
-  "coach-management": "Coach Management",
-  "coach-attendance": "Coach Attendance",
+  dashboard: "Programme Dashboard",
+  sessions: "Session Tracking",
   timetable: "Timetable",
-  "session-tracker": "Session Tracker",
-  "cancellation-log": "Cancellation Log",
-  "curriculum-tracker": "Curriculum Tracker",
-  "student-assessment": "Student Assessment",
-  "equipment-log": "Equipment Log",
-  "school-portal": "School Portal",
-  "coach-mobile": "Coach Mobile View",
+  coaches: "Coaches",
+  attendance: "Coach Attendance",
+  "school-view": "School View",
+  "coach-view": "Coach View",
   "team-access": "Team Access",
 };
 
@@ -100,6 +74,6 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export const ROLE_HOME: Record<Role, ModuleKey> = {
   admin: "dashboard",
-  coach: "coach-mobile",
-  school: "school-portal",
+  coach: "coach-view",
+  school: "school-view",
 };
